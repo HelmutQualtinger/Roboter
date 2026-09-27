@@ -1,0 +1,73 @@
+# Session: 5-Achsen-Roboterarm in Three.js
+
+**Datum:** 2026-09-27
+**Projektordner:** `/Users/haraldbeker/Roboter`
+**Dateien:** `prompt.md` (Aufgabenstellung), `robot-arm.html` (Ergebnis, eigenständige Seite)
+
+## Aufgabenstellung (aus `prompt.md`)
+
+- Roboter mit 5 Achsen: Greifarm mit zwei Gelenken, um seine Achse drehbar; Greifer um seine Achse drehbar; schließbare Zange.
+- Darstellung in Three.js, pro Achse ein Regler.
+- Am Boden ein beweglicher, greifbarer Klotz.
+- **Zusatz:** Kollision des Greifers mit Boden und Würfel erkennen, bei Kollision blockieren und nur Zurückfahren erlauben; Würfel klein genug zum Greifen.
+
+## Verlauf der Anforderungen
+
+1. Grundgerüst: 5 Achsen mit Reglern, Orbit-Kamera, ziehbarer Klotz, Greifen durch Schließen der Zange nahe am Klotz.
+2. Kollisionserkennung Boden/Würfel mit Sperre (nur Zurückfahren), Würfel verkleinert.
+3. Boden erst als eisernes Gitterrost, später auf Wunsch als **Schachbrett** aus Stahlplatten.
+4. **Kamera am Greifer** (mittig zwischen den Backen) mit kleinem Live-Monitor oben rechts.
+5. Langsame **Pick-up-Demo**: eine Achse nach der anderen, je 2 Sekunden, mit Sicherheits-Warnton.
+6. Demo-Choreografie verfeinert: über dem Würfel ausrichten, Zange so drehen, dass die Backen waagerecht beidseits des Würfels stehen, absenken, schließen, sofort anheben; beim Loslassen legt sich der Würfel flach auf den Boden.
+7. Kein Autostart mehr – Demo startet per Button **„Pick-up starten“**.
+
+## Aktueller Stand von `robot-arm.html`
+
+### Achsen
+
+| Achse | Funktion | Bereich |
+|---|---|---|
+| 1 | Basisdrehung (um Hochachse) | −180° … 180° |
+| 2 | Schulter | −90° … 90° |
+| 3 | Ellbogen | −120° … 120° |
+| 4 | Greiferdrehung (Rollen um eigene Achse) | −180° … 180° |
+| 5 | Zange | 0 % (geschlossen) … 100 % (offen) |
+
+### Funktionen
+
+- **Greifen:** Zange ≤ 12 % geschlossen und TCP (Punkt zwischen den Backen) näher als 0,4 am Würfel → Würfel wird an den Greifer gehängt. Öffnen ≥ 22 % → loslassen, Würfel sinkt ab und richtet sich flach aus (Drehung um die Hochachse bleibt).
+- **Kollisionssperre:** Greifer wird durch Kugeln angenähert (Gehäuse, beide Backenspitzen, TCP). Jede Bewegung, die tiefer in Boden oder Würfel führen würde, wird blockiert (Achsen-Box blinkt rot); Zurückfahren bleibt erlaubt. Gilt für Regler und Demo gleichermaßen. Sitzt der Würfel zwischen den Backen, dürfen diese ihn berühren.
+- **Greifer-Kamera:** am Greifer montiert, Bild oben rechts im 3D-Bereich.
+- **Pick-up-Demo (Button):** Basis zum Würfel → Zange öffnen → über dem Würfel schweben → Zange um −90° drehen (Backen waagerecht) → absenken → schließen → sofort anheben → zum Ablageort (+130°) drehen → knapp über dem Boden absenken → loslassen → zurück in Ruhestellung. Warnton (Web Audio) läuft währenddessen, Regler sind gesperrt, Reset bricht ab.
+- **Reset:** Ruhestellung und Würfel an Startposition (3,0 / 0,11 / 0).
+
+## Wichtige Erkenntnisse und behobene Fehler
+
+- **Geometrie-Grenze:** Effektive Unterarmlänge bis zum TCP ist 2,685 (nicht ~2,04 wie anfangs überschlagen). Liegt der Würfel näher als ca. 2,3 Einheiten an der Basis, müsste der Ellbogen über sein ±120°-Limit einknicken → nicht erreichbar. Ein senkrechter Zugriff von oben ist mit diesen Gliedlängen praktisch nicht möglich; der Greifer steht beim Greifen ca. 40° schräg.
+- **Backen-Ausrichtung:** Waagerecht können die Backen nur quer zur Armebene stehen. Damit sie gleichzeitig parallel zu den Würfelkanten sind, liegt der Würfel auf der Linie z = 0.
+- **Numerischer Löser:** Handgerechnete Winkel lagen daneben. Ersetzt durch Mustersuche (8 Richtungen, mehrere Startpunkte) gegen die echte Vorwärtskinematik der Szene. Die erste Version (nur 4 Achsrichtungen, veraltete Werte) blieb an Randwerten hängen.
+- **Kollisionsradien:** Zu große Kugeln (Gehäuse 0,29, Würfel-Raumdiagonale) blockierten weit vor echtem Kontakt → verkleinert (Gehäuse 0,13, Backen 0,07, Würfel 0,128).
+- **Greifen vs. Kollision:** Ein Griff hat Vorrang vor der Kollisionssperre, sonst blockierten die Backenspitzen die letzte Annäherung.
+- **Verzögerte Frames:** Ein großer Frame-Sprung in die Kollision ließ eine Achse komplett stehen. Jetzt fährt sie per Bisektion bis an die Grenze.
+- **Anheben nach dem Griff:** Der erste Heben-Schritt bewegte eine Achse, die beim Absenken nicht benutzt wurde → Würfel sank kurz in den Boden. Jetzt wird die Absenkbewegung zuerst umgekehrt.
+- **Banner blieb sichtbar:** `#demo-banner { display: flex }` überschrieb das `hidden`-Attribut → `#demo-banner[hidden] { display: none }`.
+- **Warnton:** Browser blockieren Audio ohne Nutzer-Geste; durch den Start-Button ist das gelöst.
+
+## Verifikation
+
+Mit Playwright (Chromium, headless) im echten Browser geprüft, Testskripte lagen nur im Scratchpad:
+
+- Beim Laden kein Autostart, Ruhestellung.
+- Zwei aufeinanderfolgende Button-Läufe: jeweils gegriffen und abgelegt, keine Kollisionssperre ausgelöst, keine Seitenfehler.
+- Würfel landet flach (0° Neigung) auf y = 0,11.
+- Dreifache Wiederholung mit identischem Ergebnis (deterministisch).
+
+## Bekannte Grenzen / offene Punkte
+
+- Liegt der Würfel außerhalb der erreichbaren Zone (zu nah an der Basis), greift die Demo daneben – es gibt noch keine Meldung dafür.
+- Liegt der Würfel nicht auf der Armachse bzw. ist gedreht, können die Backen nicht gleichzeitig waagerecht und kantenparallel stehen; der Löser wählt dann den besten Kompromiss.
+- Der Würfel sinkt beim Loslassen linear ab (keine echte Physik).
+
+## Benutzung
+
+`robot-arm.html` direkt im Browser öffnen (Three.js r128 wird von `cdn.jsdelivr.net` geladen, Internet nötig). Regler bedienen, im 3D-Bild ziehen zum Drehen, scrollen zum Zoomen, Würfel mit der Maus verschieben, „Pick-up starten“ für die Demo.
