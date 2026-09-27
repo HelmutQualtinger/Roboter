@@ -269,6 +269,28 @@
   #reset-btn:hover{ background: #2a1e0c; }
   #reset-btn:active{ background: #3a2a10; }
 
+  .btn-row{
+    display: flex;
+    gap: 0.6rem;
+  }
+  #demo-btn{
+    flex: 1 1 0;
+    padding: 0.65rem;
+    border-radius: 8px;
+    border: 1px solid var(--accent);
+    background: var(--accent);
+    color: #1a1005;
+    font-size: 0.85rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    cursor: pointer;
+    transition: filter 0.15s ease;
+  }
+  #demo-btn:hover{ filter: brightness(1.08); }
+  #demo-btn:disabled{ opacity: 0.45; cursor: not-allowed; filter: none; }
+  .btn-row #reset-btn{ flex: 1 1 0; width: auto; }
+  #demo-btn:focus-visible, #reset-btn:focus-visible{ outline: 2px solid var(--text); outline-offset: 2px; }
+
   .hint{
     margin-top: 1rem;
     font-size: 0.72rem;
@@ -356,9 +378,12 @@
       <span id="status-value" class="free">Nein</span>
     </div>
 
-    <button id="reset-btn" type="button">Reset</button>
+    <div class="btn-row">
+      <button id="demo-btn" type="button">Pick-up starten</button>
+      <button id="reset-btn" type="button">Reset</button>
+    </div>
 
-    <p class="hint">Zum Greifen: Zange schlie&szlig;en (Achse 5 nahe 0%), w&auml;hrend die Greiferspitze nah am Klotz ist. Zum Loslassen: Zange &ouml;ffnen. Bei Kollision mit Boden oder Klotz stoppt die jeweilige Achse (rot) &ndash; sie l&auml;sst sich dann nur noch zur&uuml;ckfahren. Oben rechts im Bild: Live-Ansicht der am Greifer montierten Kamera. Beim Laden l&auml;uft einmal eine langsame Demo (greift den Klotz, legt ihn woanders ab); der Warnton dabei startet erst, sobald du einmal irgendwo klickst oder tippst &ndash; das verhindert der Browser sonst automatisch.</p>
+    <p class="hint">Zum Greifen: Zange schlie&szlig;en (Achse 5 nahe 0%), w&auml;hrend die Greiferspitze nah am Klotz ist. Zum Loslassen: Zange &ouml;ffnen. Bei Kollision mit Boden oder Klotz stoppt die jeweilige Achse (rot) &ndash; sie l&auml;sst sich dann nur noch zur&uuml;ckfahren. Oben rechts im Bild: Live-Ansicht der am Greifer montierten Kamera. &bdquo;Pick-up starten&ldquo; f&auml;hrt den Klotz automatisch an, greift ihn und legt ihn woanders ab (mit Warnton); Reset bricht ab.</p>
   </div>
 </div>
 
@@ -941,8 +966,10 @@
   resetBtn.addEventListener('click', function(){
     if (demoRunning){
       demoCancelled = true;
+      demoRunId++;
       stopWarningTone();
       setSlidersDisabled(false);
+      demoBtn.disabled = false;
       demoBanner.hidden = true;
       demoRunning = false;
     }
@@ -1103,9 +1130,22 @@
     graspPoint.y += 0.05;
     var grasp = solveA2A3ForPoint(a1Target, graspPoint, hover.a2, hover.a3);
     var roll = solveGripperRoll({ a1: a1Target, a2: grasp.a2, a3: grasp.a3, a5: 60 });
+    // Gerundete Zielwinkel können minimal im Boden liegen – so lange Richtung
+    // Schwebe-Pose zurücknehmen, bis die Greif-Pose kollisionsfrei ist.
+    for (var guard = 0; guard < 30; guard++){
+      var c = computeClearance({ a1: a1Target, a2: grasp.a2, a3: grasp.a3, a4: roll, a5: 60 });
+      var cClosed = computeClearance({ a1: a1Target, a2: grasp.a2, a3: grasp.a3, a4: roll, a5: 0 });
+      // Zwischenpose beim Absenken: Schulter schon unten, Ellbogen noch oben
+      var cMid = computeClearance({ a1: a1Target, a2: grasp.a2, a3: hover.a3, a4: roll, a5: 60 });
+      if (c >= 0.005 && cClosed >= 0.005 && cMid >= 0.005) break;
+      grasp.a2 += Math.sign(hover.a2 - grasp.a2) || 1;
+    }
+    applyStateToRobot();
 
     // Ablageort: 130° weiter gedreht, Klotz knapp über dem Boden loslassen.
-    var a1Drop = Math.round(clamp(a1Target + 130, -180, 180));
+    // +130° gedreht, auf den Bereich -180…180 umgebrochen (Würfel kann nach
+    // einem vorherigen Durchlauf überall liegen).
+    var a1Drop = Math.round(((a1Target + 130 + 540) % 360) - 180);
     var dropRad = THREE.MathUtils.degToRad(a1Drop);
     var dropReach = 2.8;
     var dropPoint = new THREE.Vector3(Math.cos(dropRad) * dropReach, 0.35, -Math.sin(dropRad) * dropReach);
@@ -1175,6 +1215,13 @@
   // Wie beim manuellen Regler gilt auch während der Demo die Kollisions-
   // sperre: ein Achsen-Schritt darf nicht tiefer in Boden oder Klotz
   // hineinfahren, außer die Bewegung würde gerade den Klotz greifen.
+  function isMoveAllowed(candidateState){
+    if (wouldTriggerGrab(candidateState)) return true;
+    var oldClearance = computeClearance(state);
+    var newClearance = computeClearance(candidateState);
+    return !(newClearance < 0 && newClearance < oldClearance);
+  }
+
   function tweenAxis(key, target, duration){
     return new Promise(function(resolve){
       var from = state[key];
@@ -1188,12 +1235,21 @@
         var candidateState = Object.assign({}, state);
         candidateState[key] = candidateValue;
 
-        var allowed = true;
-        if (!wouldTriggerGrab(candidateState)){
-          var oldClearance = computeClearance(state);
-          var newClearance = computeClearance(candidateState);
-          if (newClearance < 0 && newClearance < oldClearance){
-            allowed = false;
+        var allowed = isMoveAllowed(candidateState);
+        if (!allowed){
+          // Ein verzögerter Frame kann einen großen Sprung in die Kollision
+          // bedeuten – dann per Bisektion so weit wie erlaubt heranfahren,
+          // statt komplett am letzten Frame-Wert stehen zu bleiben.
+          var lo = state[key], hi = candidateValue;
+          for (var k = 0; k < 10; k++){
+            var mid = (lo + hi) / 2;
+            var midState = Object.assign({}, state);
+            midState[key] = mid;
+            if (isMoveAllowed(midState)) lo = mid; else hi = mid;
+          }
+          if (Math.abs(lo - state[key]) > 1e-3){
+            candidateValue = lo;
+            allowed = true;
           }
         }
 
@@ -1219,10 +1275,16 @@
     });
   }
 
+  var demoRunId = 0;
+  var demoBtn = document.getElementById('demo-btn');
+
   function runIntroDemo(){
+    if (demoRunning || grasped) return;
+    var runId = ++demoRunId;
     demoRunning = true;
     demoCancelled = false;
     setSlidersDisabled(true);
+    demoBtn.disabled = true;
     demoBanner.hidden = false;
     startWarningTone();
 
@@ -1235,12 +1297,18 @@
       });
     });
     chain.then(function(){
+      // Nach einem Reset-Abbruch darf ein alter Durchlauf einen neu
+      // gestarteten nicht beenden.
+      if (runId !== demoRunId) return;
       stopWarningTone();
       setSlidersDisabled(false);
+      demoBtn.disabled = false;
       demoBanner.hidden = true;
       demoRunning = false;
     });
   }
+
+  demoBtn.addEventListener('click', runIntroDemo);
 
   // ---------------------------------------------------------------------
   // Kamera-Monitor: zweiter, kleiner Renderer für das Bild der Greiferkamera
@@ -1297,8 +1365,6 @@
     camRenderer.render(scene, gripperCam);
   }
   animate();
-
-  runIntroDemo();
 
 })();
 </script>
