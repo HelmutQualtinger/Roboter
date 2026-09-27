@@ -1,0 +1,1306 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>5-Achsen Roboterarm Simulator</title>
+<style>
+  :root{
+    --bg: #0d1117;
+    --panel-bg: #161b22;
+    --panel-border: #30363d;
+    --text: #e6edf3;
+    --text-dim: #8b949e;
+    --accent: #ffb020;
+    --accent-dim: #7a5a1f;
+    --track-bg: #263041;
+    --ok: #3fb950;
+  }
+  *{ box-sizing: border-box; }
+  html, body{
+    margin: 0;
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    overflow: hidden;
+  }
+  .app{
+    display: flex;
+    width: 100vw;
+    height: 100vh;
+  }
+  #viewport{
+    flex: 1 1 70%;
+    position: relative;
+    min-width: 0;
+    background: radial-gradient(circle at 50% 30%, #131a24 0%, #0a0e14 100%);
+  }
+  #viewport canvas{
+    display: block;
+    width: 100%;
+    height: 100%;
+    touch-action: none;
+    cursor: grab;
+  }
+  #viewport canvas:active{ cursor: grabbing; }
+
+  #cam-monitor{
+    position: absolute;
+    top: 14px;
+    right: 14px;
+    width: 210px;
+    aspect-ratio: 4 / 3;
+    background: #000;
+    border: 2px solid var(--panel-border);
+    border-radius: 6px;
+    overflow: hidden;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 176, 32, 0.08);
+    pointer-events: none;
+  }
+  #cam-monitor canvas{
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+  #cam-monitor .cam-label{
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 7px;
+    font-size: 0.58rem;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--accent);
+    background: rgba(0, 0, 0, 0.55);
+    font-family: Consolas, "Courier New", monospace;
+  }
+  #cam-monitor .cam-rec{
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    color: #ff6b6b;
+    flex: 0 0 auto;
+  }
+  #cam-monitor .cam-rec::before{
+    content: "";
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: #ff3b3b;
+    box-shadow: 0 0 4px #ff3b3b;
+    animation: cam-rec-blink 1.4s infinite;
+  }
+  @keyframes cam-rec-blink{
+    0%, 100%{ opacity: 1; }
+    50%{ opacity: 0.25; }
+  }
+
+  @media (max-width: 640px){
+    #cam-monitor{ width: 128px; top: 10px; right: 10px; }
+  }
+
+  #demo-banner{
+    position: absolute;
+    top: 14px;
+    left: 14px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 12px;
+    background: rgba(10, 12, 16, 0.75);
+    border: 1px solid var(--accent-dim);
+    border-radius: 999px;
+    color: var(--accent);
+    font-size: 0.72rem;
+    letter-spacing: 0.02em;
+    pointer-events: none;
+  }
+  #demo-banner[hidden]{ display: none; }
+  .demo-dot{
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 6px var(--accent);
+    animation: cam-rec-blink 1.1s infinite;
+    flex: 0 0 auto;
+  }
+
+  #panel{
+    flex: 0 0 360px;
+    max-width: 360px;
+    background: var(--panel-bg);
+    border-left: 1px solid var(--panel-border);
+    padding: 1.25rem 1.35rem 1.5rem;
+    overflow-y: auto;
+  }
+  #panel h1{
+    font-size: 1.05rem;
+    letter-spacing: 0.02em;
+    margin: 0 0 0.15rem;
+    color: var(--text);
+  }
+  #panel .subtitle{
+    font-size: 0.78rem;
+    color: var(--text-dim);
+    margin: 0 0 1.3rem;
+    line-height: 1.4;
+  }
+
+  .axis-block{
+    margin-bottom: 1.15rem;
+    padding: 0.7rem 0.8rem 0.8rem;
+    background: #10151c;
+    border: 1px solid var(--panel-border);
+    border-radius: 8px;
+    transition: border-color 0.12s ease, box-shadow 0.12s ease, background 0.12s ease;
+  }
+  .axis-block.collision-flash{
+    border-color: #f85149;
+    background: #1c1013;
+    box-shadow: 0 0 0 1px rgba(248, 81, 73, 0.35);
+  }
+  .axis-row{
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 0.45rem;
+  }
+  .axis-label{
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--text);
+  }
+  .axis-value{
+    font-variant-numeric: tabular-nums;
+    font-size: 0.85rem;
+    color: var(--accent);
+    font-weight: 700;
+    min-width: 3.6em;
+    text-align: right;
+  }
+
+  input[type="range"]{
+    appearance: none;
+    -webkit-appearance: none;
+    width: 100%;
+    height: 20px;
+    background: transparent;
+    margin: 0;
+  }
+  input[type="range"]::-webkit-slider-runnable-track{
+    height: 6px;
+    border-radius: 3px;
+    background: linear-gradient(90deg, var(--accent-dim), var(--track-bg));
+  }
+  input[type="range"]::-webkit-slider-thumb{
+    -webkit-appearance: none;
+    appearance: none;
+    width: 17px;
+    height: 17px;
+    margin-top: -6px;
+    border-radius: 50%;
+    background: var(--accent);
+    border: 2px solid #1a1005;
+    box-shadow: 0 0 0 3px rgba(255, 176, 32, 0.18);
+    cursor: pointer;
+  }
+  input[type="range"]::-moz-range-track{
+    height: 6px;
+    border-radius: 3px;
+    background: var(--track-bg);
+  }
+  input[type="range"]::-moz-range-progress{
+    height: 6px;
+    border-radius: 3px;
+    background: var(--accent-dim);
+  }
+  input[type="range"]::-moz-range-thumb{
+    width: 15px;
+    height: 15px;
+    border-radius: 50%;
+    background: var(--accent);
+    border: 2px solid #1a1005;
+    cursor: pointer;
+  }
+
+  .range-endcaps{
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.66rem;
+    color: var(--text-dim);
+    margin-top: 0.15rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .status-block{
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.7rem 0.8rem;
+    background: #10151c;
+    border: 1px solid var(--panel-border);
+    border-radius: 8px;
+    margin-bottom: 1rem;
+    font-size: 0.85rem;
+  }
+  #status-value{
+    font-weight: 700;
+  }
+  #status-value.grasped{ color: var(--ok); }
+  #status-value.free{ color: var(--text-dim); }
+
+  #reset-btn{
+    width: 100%;
+    padding: 0.65rem;
+    border-radius: 8px;
+    border: 1px solid var(--accent-dim);
+    background: #1e1608;
+    color: var(--accent);
+    font-size: 0.85rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    cursor: pointer;
+    transition: background 0.15s ease;
+  }
+  #reset-btn:hover{ background: #2a1e0c; }
+  #reset-btn:active{ background: #3a2a10; }
+
+  .hint{
+    margin-top: 1rem;
+    font-size: 0.72rem;
+    line-height: 1.5;
+    color: var(--text-dim);
+  }
+
+  @media (max-width: 640px){
+    .app{ flex-direction: column; }
+    #viewport{ flex: 1 1 55%; }
+    #panel{
+      flex: 1 1 45%;
+      max-width: none;
+      border-left: none;
+      border-top: 1px solid var(--panel-border);
+    }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <div id="viewport">
+    <canvas id="scene-canvas"></canvas>
+    <div id="cam-monitor">
+      <div class="cam-label"><span>Greifer-Kamera</span><span class="cam-rec">REC</span></div>
+      <canvas id="cam-canvas"></canvas>
+    </div>
+    <div id="demo-banner" hidden>
+      <span class="demo-dot"></span>
+      <span>Autonome Demo l&auml;uft &ndash; eine Achse nach der anderen</span>
+    </div>
+  </div>
+
+  <div id="panel">
+    <h1>Roboterarm Steuerung</h1>
+    <p class="subtitle">5-Achsen Greifarm &middot; ziehe im 3D-Bild um die Kamera zu drehen, scrolle zum Zoomen, ziehe den Klotz direkt mit der Maus.</p>
+
+    <div class="axis-block">
+      <div class="axis-row">
+        <span class="axis-label">Achse 1 &ndash; Basisdrehung</span>
+        <span class="axis-value" id="val-axis1">0&deg;</span>
+      </div>
+      <input type="range" id="axis1" min="-180" max="180" step="1" value="0">
+      <div class="range-endcaps"><span>-180&deg;</span><span>180&deg;</span></div>
+    </div>
+
+    <div class="axis-block">
+      <div class="axis-row">
+        <span class="axis-label">Achse 2 &ndash; Schulter</span>
+        <span class="axis-value" id="val-axis2">0&deg;</span>
+      </div>
+      <input type="range" id="axis2" min="-90" max="90" step="1" value="-25">
+      <div class="range-endcaps"><span>-90&deg;</span><span>90&deg;</span></div>
+    </div>
+
+    <div class="axis-block">
+      <div class="axis-row">
+        <span class="axis-label">Achse 3 &ndash; Ellbogen</span>
+        <span class="axis-value" id="val-axis3">0&deg;</span>
+      </div>
+      <input type="range" id="axis3" min="-120" max="120" step="1" value="50">
+      <div class="range-endcaps"><span>-120&deg;</span><span>120&deg;</span></div>
+    </div>
+
+    <div class="axis-block">
+      <div class="axis-row">
+        <span class="axis-label">Achse 4 &ndash; Greiferdrehung</span>
+        <span class="axis-value" id="val-axis4">0&deg;</span>
+      </div>
+      <input type="range" id="axis4" min="-180" max="180" step="1" value="0">
+      <div class="range-endcaps"><span>-180&deg;</span><span>180&deg;</span></div>
+    </div>
+
+    <div class="axis-block">
+      <div class="axis-row">
+        <span class="axis-label">Achse 5 &ndash; Zange</span>
+        <span class="axis-value" id="val-axis5">30%</span>
+      </div>
+      <input type="range" id="axis5" min="0" max="100" step="1" value="30">
+      <div class="range-endcaps"><span>geschlossen</span><span>offen</span></div>
+    </div>
+
+    <div class="status-block">
+      <span>Objekt gegriffen:</span>
+      <span id="status-value" class="free">Nein</span>
+    </div>
+
+    <button id="reset-btn" type="button">Reset</button>
+
+    <p class="hint">Zum Greifen: Zange schlie&szlig;en (Achse 5 nahe 0%), w&auml;hrend die Greiferspitze nah am Klotz ist. Zum Loslassen: Zange &ouml;ffnen. Bei Kollision mit Boden oder Klotz stoppt die jeweilige Achse (rot) &ndash; sie l&auml;sst sich dann nur noch zur&uuml;ckfahren. Oben rechts im Bild: Live-Ansicht der am Greifer montierten Kamera. Beim Laden l&auml;uft einmal eine langsame Demo (greift den Klotz, legt ihn woanders ab); der Warnton dabei startet erst, sobald du einmal irgendwo klickst oder tippst &ndash; das verhindert der Browser sonst automatisch.</p>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script>
+(function(){
+  "use strict";
+
+  // ---------------------------------------------------------------------
+  // Grundgerüst: Renderer, Szene, Kamera
+  // ---------------------------------------------------------------------
+  var canvas = document.getElementById('scene-canvas');
+  var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+
+  var scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x0a0e14);
+  scene.fog = new THREE.Fog(0x0a0e14, 12, 26);
+
+  var camera = new THREE.PerspectiveCamera(50, 1, 0.1, 100);
+
+  // Manuelle "Orbit"-Kamera (kein OrbitControls-Import nötig)
+  var cam = {
+    azimuth: Math.PI / 4,
+    polar: Math.PI / 3.1,
+    radius: 7.5,
+    target: new THREE.Vector3(0, 1.2, 0)
+  };
+
+  function clamp(v, lo, hi){ return Math.max(lo, Math.min(hi, v)); }
+
+  function updateCameraPosition(){
+    var p = cam.polar, a = cam.azimuth, r = cam.radius, t = cam.target;
+    camera.position.set(
+      t.x + r * Math.sin(p) * Math.sin(a),
+      t.y + r * Math.cos(p),
+      t.z + r * Math.sin(p) * Math.cos(a)
+    );
+    camera.lookAt(t);
+  }
+  updateCameraPosition();
+
+  // ---------------------------------------------------------------------
+  // Licht
+  // ---------------------------------------------------------------------
+  scene.add(new THREE.AmbientLight(0x8899aa, 0.55));
+  var keyLight = new THREE.DirectionalLight(0xffffff, 0.85);
+  keyLight.position.set(5, 8, 4);
+  scene.add(keyLight);
+  var fillLight = new THREE.DirectionalLight(0x6688ff, 0.25);
+  fillLight.position.set(-6, 3, -4);
+  scene.add(fillLight);
+
+  // ---------------------------------------------------------------------
+  // Boden: Schachbrettmuster aus Stahlplatten (prozedural erzeugte Textur,
+  // damit kein externes Bild geladen werden muss). Ein Feld = eine
+  // Welteinheit, damit sich Abstände in der Szene leicht abschätzen lassen.
+  // ---------------------------------------------------------------------
+  function createCheckerboardTexture(){
+    var CELLS = 14;   // Felder pro Seite = Bodengröße in Welteinheiten
+    var cellPx = 48;
+    var size = CELLS * cellPx;
+    var c = document.createElement('canvas');
+    c.width = c.height = size;
+    var ctx = c.getContext('2d');
+
+    var colorLight = '#6d747c';
+    var colorDark = '#33373d';
+
+    for (var iy = 0; iy < CELLS; iy++){
+      for (var ix = 0; ix < CELLS; ix++){
+        ctx.fillStyle = ((ix + iy) % 2 === 0) ? colorLight : colorDark;
+        ctx.fillRect(ix * cellPx, iy * cellPx, cellPx, cellPx);
+
+        // Leichter Verlauf je Feld, damit die Platten nicht komplett flach wirken
+        var grad = ctx.createLinearGradient(ix * cellPx, iy * cellPx, ix * cellPx, iy * cellPx + cellPx);
+        grad.addColorStop(0, 'rgba(255,255,255,0.07)');
+        grad.addColorStop(0.55, 'rgba(255,255,255,0)');
+        grad.addColorStop(1, 'rgba(0,0,0,0.14)');
+        ctx.fillStyle = grad;
+        ctx.fillRect(ix * cellPx, iy * cellPx, cellPx, cellPx);
+      }
+    }
+
+    // Fugenlinien zwischen den Platten
+    ctx.strokeStyle = 'rgba(8,10,12,0.65)';
+    ctx.lineWidth = 2;
+    for (var i = 0; i <= CELLS; i++){
+      ctx.beginPath(); ctx.moveTo(i * cellPx, 0); ctx.lineTo(i * cellPx, size); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, i * cellPx); ctx.lineTo(size, i * cellPx); ctx.stroke();
+    }
+
+    // Leichte Rostspuren für Materialcharakter
+    var rng = 1234567;
+    function rand(){ rng = (rng * 16807) % 2147483647; return rng / 2147483647; }
+    for (var i2 = 0; i2 < 160; i2++){
+      var rx = rand() * size, ry = rand() * size, rr = rand() * 3 + 0.5;
+      ctx.fillStyle = 'rgba(120,70,30,' + (rand() * 0.14).toFixed(3) + ')';
+      ctx.beginPath();
+      ctx.arc(rx, ry, rr, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    return c;
+  }
+
+  var groundTexture = new THREE.CanvasTexture(createCheckerboardTexture());
+  // Das Muster deckt die gesamte 14x14-Bodenfläche ab (1 Feld = 1 Einheit),
+  // daher keine Wiederholung nötig.
+  groundTexture.wrapS = groundTexture.wrapT = THREE.RepeatWrapping;
+  groundTexture.repeat.set(1, 1);
+  if (renderer.capabilities && renderer.capabilities.getMaxAnisotropy){
+    groundTexture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  }
+
+  var ground = new THREE.Mesh(
+    new THREE.PlaneGeometry(14, 14),
+    new THREE.MeshStandardMaterial({
+      map: groundTexture,
+      metalness: 0.45,
+      roughness: 0.55
+    })
+  );
+  ground.rotation.x = -Math.PI / 2;
+  scene.add(ground);
+
+  // ---------------------------------------------------------------------
+  // Roboterarm: kinematische Kette über verschachtelte Groups
+  // ---------------------------------------------------------------------
+  var jointMat = new THREE.MeshStandardMaterial({ color: 0x5aa9e6, metalness: 0.35, roughness: 0.4 });
+  var baseMat  = new THREE.MeshStandardMaterial({ color: 0x4a5568, metalness: 0.45, roughness: 0.5 });
+  var armMat   = new THREE.MeshStandardMaterial({ color: 0x8892a0, metalness: 0.35, roughness: 0.55 });
+  var gripperMat = new THREE.MeshStandardMaterial({ color: 0xffb020, metalness: 0.3, roughness: 0.5 });
+  var jawMat   = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, metalness: 0.4, roughness: 0.4 });
+
+  // Feststehender Sockel (Pedestal) auf dem Boden
+  var PEDESTAL_H = 0.6;
+  var pedestal = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.72, 0.85, PEDESTAL_H, 32),
+    baseMat
+  );
+  pedestal.position.y = PEDESTAL_H / 2;
+  scene.add(pedestal);
+
+  // Achse 1 – Basisdrehung (rotiert um Y, sitzt oben auf dem Sockel)
+  var axis1Group = new THREE.Group();
+  axis1Group.position.y = PEDESTAL_H;
+  scene.add(axis1Group);
+
+  var turret = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.6, 0.3, 32), baseMat);
+  turret.position.y = 0.15;
+  axis1Group.add(turret);
+
+  // Achse 2 – Schulter (rotiert um Z, oben auf dem Turm)
+  var TURRET_H = 0.3;
+  var shoulderGroup = new THREE.Group();
+  shoulderGroup.position.y = TURRET_H;
+  axis1Group.add(shoulderGroup);
+
+  var shoulderJointMesh = new THREE.Mesh(new THREE.SphereGeometry(0.28, 20, 16), jointMat);
+  shoulderGroup.add(shoulderJointMesh);
+
+  var UPPER_ARM_LEN = 2.0;
+  var upperArmMesh = new THREE.Mesh(new THREE.BoxGeometry(0.34, UPPER_ARM_LEN, 0.34), armMat);
+  upperArmMesh.position.y = UPPER_ARM_LEN / 2;
+  shoulderGroup.add(upperArmMesh);
+
+  // Achse 3 – Ellbogen (rotiert um Z relativ zum Oberarm, am Ende des Oberarms)
+  var elbowGroup = new THREE.Group();
+  elbowGroup.position.y = UPPER_ARM_LEN;
+  shoulderGroup.add(elbowGroup);
+
+  var elbowJointMesh = new THREE.Mesh(new THREE.SphereGeometry(0.24, 20, 16), jointMat);
+  elbowGroup.add(elbowJointMesh);
+
+  var FOREARM_LEN = 1.7;
+  var forearmMesh = new THREE.Mesh(new THREE.BoxGeometry(0.28, FOREARM_LEN, 0.28), armMat);
+  forearmMesh.position.y = FOREARM_LEN / 2;
+  elbowGroup.add(forearmMesh);
+
+  // Achse 4 – Greiferdrehung (Roll um die eigene Längsachse des Unterarms = lokale Y-Achse)
+  var wristRoll = new THREE.Group();
+  wristRoll.position.y = FOREARM_LEN;
+  elbowGroup.add(wristRoll);
+
+  var wristJointMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.22, 20), jointMat);
+  wristJointMesh.rotation.x = 0; // Zylinderachse liegt bereits auf lokaler Y-Achse
+  wristRoll.add(wristJointMesh);
+
+  var GRIPPER_BODY_LEN = 0.45;
+  var GRIPPER_BASE_Y = 0.11;
+  var gripperBodyMesh = new THREE.Mesh(new THREE.BoxGeometry(0.3, GRIPPER_BODY_LEN, 0.22), gripperMat);
+  gripperBodyMesh.position.y = GRIPPER_BASE_Y + GRIPPER_BODY_LEN / 2;
+  wristRoll.add(gripperBodyMesh);
+
+  // Achse 5 – Zange: zwei Backen, die um ein Scharnier nach außen klappen
+  var JAW_LEN = 0.5;
+  var JAW_OFFSET_X = 0.11;
+  var JAW_HINGE_Y = GRIPPER_BASE_Y + GRIPPER_BODY_LEN;
+  var jawGeo = new THREE.BoxGeometry(0.09, JAW_LEN, 0.16);
+
+  var jawPivotL = new THREE.Group();
+  jawPivotL.position.set(JAW_OFFSET_X, JAW_HINGE_Y, 0);
+  wristRoll.add(jawPivotL);
+  var jawMeshL = new THREE.Mesh(jawGeo, jawMat);
+  jawMeshL.position.y = JAW_LEN / 2;
+  jawPivotL.add(jawMeshL);
+  var jawTipL = new THREE.Object3D();
+  jawTipL.position.y = JAW_LEN;
+  jawPivotL.add(jawTipL);
+
+  var jawPivotR = new THREE.Group();
+  jawPivotR.position.set(-JAW_OFFSET_X, JAW_HINGE_Y, 0);
+  wristRoll.add(jawPivotR);
+  var jawMeshR = new THREE.Mesh(jawGeo, jawMat);
+  jawMeshR.position.y = JAW_LEN / 2;
+  jawPivotR.add(jawMeshR);
+  var jawTipR = new THREE.Object3D();
+  jawTipR.position.y = JAW_LEN;
+  jawPivotR.add(jawTipR);
+
+  // Unsichtbarer TCP-Punkt (Tool Center Point) zwischen den Backenspitzen
+  var tcp = new THREE.Object3D();
+  tcp.position.set(0, JAW_HINGE_Y + JAW_LEN * 0.85, 0);
+  wristRoll.add(tcp);
+
+  // Kamera, fest am Greifarm montiert – mittig zwischen den beiden Zangen-
+  // backen auf der Stirnfläche des Greifergehäuses (dort, wo die Backen
+  // ansetzen), damit man beim Greifen direkt zwischen die Zange hindurch auf
+  // das Objekt blickt. Sitzt als Kind von wristRoll und bewegt sich damit
+  // starr mit jeder Achsenbewegung mit; Blickrichtung = Vorwärtsrichtung des
+  // Greifers (lokale +Y-Achse, dieselbe Richtung wie TCP).
+  var CAM_FACE_Y = JAW_HINGE_Y; // Stirnfläche, an der beide Zangenscharniere sitzen
+  var camLensMat = new THREE.MeshStandardMaterial({ color: 0x0c1f3a, metalness: 0.2, roughness: 0.15, emissive: 0x0a2a4a, emissiveIntensity: 0.4 });
+
+  var camLens = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.05, 0.03, 20), camLensMat);
+  camLens.position.set(0, CAM_FACE_Y + 0.015, 0);
+  wristRoll.add(camLens);
+
+  var gripperCam = new THREE.PerspectiveCamera(62, 4 / 3, 0.05, 30);
+  gripperCam.position.set(0, CAM_FACE_Y + 0.06, 0);
+  gripperCam.rotation.x = Math.PI / 2;
+  wristRoll.add(gripperCam);
+
+  // ---------------------------------------------------------------------
+  // Beweglicher, greifbarer Klotz
+  // ---------------------------------------------------------------------
+  // Klein genug, um zwischen den Backen der Zange zu passen (siehe Greif- und
+  // Kollisionslogik weiter unten, die auf diese Gr&ouml;&szlig;e abgestimmt ist).
+  var BLOCK_SIZE = 0.22;
+  // Knapp über der halben Kantenlänge statt der vollen Raumdiagonale: eine
+  // großzügigere Kugel würde schon "Kollision" melden, wenn der Greifer noch
+  // ein gutes Stück von der tatsächlichen Würfeloberfläche entfernt ist.
+  var BLOCK_COLLIDE_R = BLOCK_SIZE * 0.58;
+  var block = new THREE.Mesh(
+    new THREE.BoxGeometry(BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE),
+    new THREE.MeshStandardMaterial({ color: 0xef4444, roughness: 0.6, metalness: 0.05 })
+  );
+  // Reichweite ca. 3.0 Einheiten: nah genug für einen Greifvorgang, aber
+  // weit genug, dass der Ellbogen (Achse 3, Limit ±120°) nicht über sein
+  // Limit hinaus einknicken müsste, um von oben an den Klotz heranzukommen
+  // (bei kürzerer Distanz reicht der Winkelbereich geometrisch nicht aus).
+  // Auf der Achse der Ruhestellung (z = 0): die Backen können nur quer zur
+  // Armebene waagerecht stehen – so liegen sie dann auch parallel zu den
+  // Würfelkanten.
+  var blockStartPos = new THREE.Vector3(3.0, BLOCK_SIZE / 2, 0);
+  block.position.copy(blockStartPos);
+  scene.add(block);
+
+  // ---------------------------------------------------------------------
+  // Achsen-Zustand + Home-Pose
+  // ---------------------------------------------------------------------
+  var HOME = { a1: 0, a2: -25, a3: 50, a4: 0, a5: 30 };
+  var state = {
+    a1: HOME.a1, a2: HOME.a2, a3: HOME.a3, a4: HOME.a4, a5: HOME.a5
+  };
+
+  function applyStateToRobot(){
+    axis1Group.rotation.y = THREE.MathUtils.degToRad(state.a1);
+    shoulderGroup.rotation.z = THREE.MathUtils.degToRad(state.a2);
+    elbowGroup.rotation.z = THREE.MathUtils.degToRad(state.a3);
+    wristRoll.rotation.y = THREE.MathUtils.degToRad(state.a4);
+    var jawAngle = THREE.MathUtils.degToRad((state.a5 / 100) * 45);
+    jawPivotL.rotation.z = -jawAngle;
+    jawPivotR.rotation.z = jawAngle;
+  }
+  applyStateToRobot();
+
+  // ---------------------------------------------------------------------
+  // UI: Slider verdrahten
+  // ---------------------------------------------------------------------
+  var sliderEls = {
+    a1: document.getElementById('axis1'),
+    a2: document.getElementById('axis2'),
+    a3: document.getElementById('axis3'),
+    a4: document.getElementById('axis4'),
+    a5: document.getElementById('axis5')
+  };
+  var valueEls = {
+    a1: document.getElementById('val-axis1'),
+    a2: document.getElementById('val-axis2'),
+    a3: document.getElementById('val-axis3'),
+    a4: document.getElementById('val-axis4'),
+    a5: document.getElementById('val-axis5')
+  };
+  var statusEl = document.getElementById('status-value');
+  var resetBtn = document.getElementById('reset-btn');
+
+  function formatValue(key, v){
+    return key === 'a5' ? (v + '%') : (v + '°');
+  }
+
+  function syncReadout(key){
+    valueEls[key].textContent = formatValue(key, state[key]);
+  }
+
+  function syncSlidersFromState(){
+    Object.keys(sliderEls).forEach(function(key){
+      sliderEls[key].value = state[key];
+      syncReadout(key);
+    });
+  }
+
+  var axisBlockEls = {};
+  Object.keys(sliderEls).forEach(function(key){
+    axisBlockEls[key] = sliderEls[key].closest('.axis-block');
+  });
+
+  function flashCollision(key){
+    var el = axisBlockEls[key];
+    if (!el) return;
+    el.classList.add('collision-flash');
+    clearTimeout(el._collisionTimer);
+    el._collisionTimer = setTimeout(function(){ el.classList.remove('collision-flash'); }, 350);
+  }
+
+  Object.keys(sliderEls).forEach(function(key){
+    sliderEls[key].addEventListener('input', function(e){
+      var candidateValue = Number(e.target.value);
+      var candidateState = Object.assign({}, state);
+      candidateState[key] = candidateValue;
+
+      if (!wouldTriggerGrab(candidateState)){
+        var oldClearance = computeClearance(state);
+        var newClearance = computeClearance(candidateState);
+
+        if (newClearance < 0 && newClearance < oldClearance){
+          // Bewegung würde tiefer in eine Kollision hineinfahren -> blockieren,
+          // nur ein Zurückfahren (newClearance >= oldClearance) ist erlaubt.
+          e.target.value = state[key];
+          applyStateToRobot();
+          flashCollision(key);
+          return;
+        }
+      }
+
+      state[key] = candidateValue;
+      syncReadout(key);
+      applyStateToRobot();
+    });
+  });
+  syncSlidersFromState();
+
+  // ---------------------------------------------------------------------
+  // Greif-Logik (jeden Frame geprüft)
+  // ---------------------------------------------------------------------
+  var grasped = false;
+  var settling = false;
+  var settleStartTime = 0;
+  var settleFromY = 0;
+  var settleFromQuat = new THREE.Quaternion();
+  var settleToQuat = new THREE.Quaternion();
+  var SETTLE_DURATION = 450; // ms
+  var GRAB_DISTANCE = 0.4;
+  var CLOSE_THRESHOLD = 12;   // a5 <= diese % gilt als "geschlossen"
+  var OPEN_THRESHOLD = 22;    // a5 >= diese % löst die Zange wieder
+
+  // ---------------------------------------------------------------------
+  // Kollisionserkennung: Greifer gegen Boden und Klotz
+  // ---------------------------------------------------------------------
+  // Der Greifer wird durch ein paar Kugeln an seinen kritischen Punkten
+  // angenähert (Gehäuse + beide Backenspitzen + TCP). Für einen Kandidaten-
+  // Zustand wird der kleinste Abstand ("Clearance") zu Boden und Klotz
+  // berechnet: <0 heißt Durchdringung. Beim Verstellen eines Reglers wird
+  // nur akzeptiert, wenn dadurch keine Kollision entsteht ODER sich eine
+  // bestehende Kollision verbessert (Zurückfahren).
+  // Absichtlich kleiner als die halbe Raumdiagonale des Gehäuses: das Gehäuse
+  // sitzt näher am Handgelenk als die Backenspitzen, daher würde ein größerer
+  // Radius hier den Boden-Kontakt melden, bevor die Backenspitzen überhaupt
+  // in Bodennähe kommen – der Greifer könnte dann nie nah genug heran.
+  var COLLIDE_R_BODY = 0.13;
+  var COLLIDE_R_JAW = 0.07;
+  var COLLIDE_R_TCP = 0.05;
+  var collisionPoints = [
+    { obj: gripperBodyMesh, r: COLLIDE_R_BODY },
+    { obj: jawTipL, r: COLLIDE_R_JAW },
+    { obj: jawTipR, r: COLLIDE_R_JAW },
+    // Der TCP liegt zwischen den Backen – genau dort gehört der Klotz beim
+    // Greifen hin, daher zählt er nur für den Boden, nicht für den Klotz.
+    { obj: tcp, r: COLLIDE_R_TCP, floorOnly: true }
+  ];
+  var tmpPointWorld = new THREE.Vector3();
+  var tmpBlockWorldForClearance = new THREE.Vector3();
+
+  function applyCandidatePose(s){
+    axis1Group.rotation.y = THREE.MathUtils.degToRad(s.a1);
+    shoulderGroup.rotation.z = THREE.MathUtils.degToRad(s.a2);
+    elbowGroup.rotation.z = THREE.MathUtils.degToRad(s.a3);
+    wristRoll.rotation.y = THREE.MathUtils.degToRad(s.a4);
+    var jawAngle = THREE.MathUtils.degToRad((s.a5 / 100) * 45);
+    jawPivotL.rotation.z = -jawAngle;
+    jawPivotR.rotation.z = jawAngle;
+    axis1Group.updateMatrixWorld(true);
+  }
+
+  function computeClearance(candidateState){
+    applyCandidatePose(candidateState);
+
+    // Sitzt der Klotz bereits zwischen den Backen (TCP nah dran), dürfen die
+    // Backen ihn berühren und sich um ihn schließen.
+    var checkCube = !grasped;
+    if (checkCube){
+      block.getWorldPosition(tmpBlockWorldForClearance);
+      tcp.getWorldPosition(tmpPointWorld);
+      if (tmpPointWorld.distanceTo(tmpBlockWorldForClearance) < GRAB_DISTANCE) checkCube = false;
+    }
+
+    var minClearance = Infinity;
+    collisionPoints.forEach(function(p){
+      p.obj.getWorldPosition(tmpPointWorld);
+      minClearance = Math.min(minClearance, tmpPointWorld.y - p.r); // Boden
+      if (checkCube && !p.floorOnly){
+        var cubeClearance = tmpPointWorld.distanceTo(tmpBlockWorldForClearance) - p.r - BLOCK_COLLIDE_R;
+        minClearance = Math.min(minClearance, cubeClearance);
+      }
+    });
+    return minClearance;
+  }
+
+  // Prüft, ob ein Kandidaten-Zustand einen gültigen Greifvorgang auslösen
+  // würde (gleiche Bedingung wie in updateGrabLogic). Wird benutzt, damit ein
+  // erfolgreicher Griff immer Vorrang vor der Kollisionssperre hat – sonst
+  // könnten die (geometrisch etwas weiter vorn liegenden) Backenspitzen die
+  // letzte Bewegung zum Klotz hin blockieren, kurz bevor der TCP nah genug
+  // für den Griff wäre.
+  function wouldTriggerGrab(candidateState){
+    if (grasped || dragging || candidateState.a5 > CLOSE_THRESHOLD) return false;
+    applyCandidatePose(candidateState);
+    tcp.getWorldPosition(tmpTcpWorldForGrabCheck);
+    block.getWorldPosition(tmpBlockWorldForGrabCheck);
+    return tmpTcpWorldForGrabCheck.distanceTo(tmpBlockWorldForGrabCheck) < GRAB_DISTANCE;
+  }
+  var tmpTcpWorldForGrabCheck = new THREE.Vector3();
+  var tmpBlockWorldForGrabCheck = new THREE.Vector3();
+
+  var tmpTcpWorld = new THREE.Vector3();
+  var tmpBlockWorld = new THREE.Vector3();
+  var mat4 = new THREE.Matrix4();
+
+  function reparentPreservingWorld(obj, newParent){
+    obj.updateMatrixWorld(true);
+    newParent.updateMatrixWorld(true);
+    var parentInverse = mat4.copy(newParent.matrixWorld).invert();
+    var localMatrix = new THREE.Matrix4().multiplyMatrices(parentInverse, obj.matrixWorld);
+    localMatrix.decompose(obj.position, obj.quaternion, obj.scale);
+    newParent.add(obj);
+  }
+
+  function updateGrabLogic(){
+    tcp.getWorldPosition(tmpTcpWorld);
+    block.getWorldPosition(tmpBlockWorld);
+    var dist = tmpTcpWorld.distanceTo(tmpBlockWorld);
+
+    if (!grasped && !dragging && state.a5 <= CLOSE_THRESHOLD && dist < GRAB_DISTANCE){
+      reparentPreservingWorld(block, wristRoll);
+      grasped = true;
+      settling = false;
+    } else if (grasped && state.a5 >= OPEN_THRESHOLD){
+      reparentPreservingWorld(block, scene);
+      grasped = false;
+      settling = true;
+      settleStartTime = performance.now();
+      settleFromY = block.position.y;
+      // Flach auf dem Boden landen: nur die Drehung um die Hochachse behalten.
+      settleFromQuat.copy(block.quaternion);
+      var yaw = new THREE.Euler().setFromQuaternion(block.quaternion, 'YXZ').y;
+      settleToQuat.setFromEuler(new THREE.Euler(0, yaw, 0, 'YXZ'));
+    }
+
+    statusEl.textContent = grasped ? 'Ja' : 'Nein';
+    statusEl.className = grasped ? 'grasped' : 'free';
+  }
+
+  function updateSettleTween(){
+    if (!settling) return;
+    var t = clamp((performance.now() - settleStartTime) / SETTLE_DURATION, 0, 1);
+    block.position.y = THREE.MathUtils.lerp(settleFromY, BLOCK_SIZE / 2, t);
+    block.quaternion.copy(settleFromQuat).slerp(settleToQuat, t);
+    if (t >= 1){
+      settling = false;
+      block.position.y = BLOCK_SIZE / 2;
+      block.quaternion.copy(settleToQuat);
+    }
+  }
+
+  // ---------------------------------------------------------------------
+  // Maus-Interaktion: Klotz ziehen (wenn nicht gegriffen) oder Kamera drehen
+  // ---------------------------------------------------------------------
+  var raycaster = new THREE.Raycaster();
+  var pointerNDC = new THREE.Vector2();
+  var groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+  var dragging = false;
+  var orbiting = false;
+  var lastPointerX = 0, lastPointerY = 0;
+
+  function setPointerNDC(e){
+    var rect = canvas.getBoundingClientRect();
+    pointerNDC.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+    pointerNDC.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+  }
+
+  canvas.addEventListener('pointerdown', function(e){
+    setPointerNDC(e);
+    lastPointerX = e.clientX;
+    lastPointerY = e.clientY;
+
+    if (!grasped && !demoRunning){
+      raycaster.setFromCamera(pointerNDC, camera);
+      var hits = raycaster.intersectObject(block, false);
+      if (hits.length > 0){
+        dragging = true;
+        settling = false;
+        canvas.setPointerCapture(e.pointerId);
+        return;
+      }
+    }
+    orbiting = true;
+    canvas.setPointerCapture(e.pointerId);
+  });
+
+  canvas.addEventListener('pointermove', function(e){
+    if (dragging){
+      setPointerNDC(e);
+      raycaster.setFromCamera(pointerNDC, camera);
+      var pt = new THREE.Vector3();
+      if (raycaster.ray.intersectPlane(groundPlane, pt)){
+        block.position.x = pt.x;
+        block.position.z = pt.z;
+        block.position.y = BLOCK_SIZE / 2;
+      }
+    } else if (orbiting){
+      var dx = e.clientX - lastPointerX;
+      var dy = e.clientY - lastPointerY;
+      cam.azimuth -= dx * 0.008;
+      cam.polar = clamp(cam.polar - dy * 0.008, 0.15, Math.PI - 0.15);
+      lastPointerX = e.clientX;
+      lastPointerY = e.clientY;
+    }
+  });
+
+  function endPointerInteraction(e){
+    dragging = false;
+    orbiting = false;
+    if (e && e.pointerId !== undefined){
+      try { canvas.releasePointerCapture(e.pointerId); } catch (err) { /* noop */ }
+    }
+  }
+  canvas.addEventListener('pointerup', endPointerInteraction);
+  canvas.addEventListener('pointercancel', endPointerInteraction);
+  canvas.addEventListener('pointerleave', function(){ orbiting = false; });
+
+  canvas.addEventListener('wheel', function(e){
+    e.preventDefault();
+    cam.radius = clamp(cam.radius + e.deltaY * 0.01, 2.5, 16);
+  }, { passive: false });
+
+  // ---------------------------------------------------------------------
+  // Reset
+  // ---------------------------------------------------------------------
+  resetBtn.addEventListener('click', function(){
+    if (demoRunning){
+      demoCancelled = true;
+      stopWarningTone();
+      setSlidersDisabled(false);
+      demoBanner.hidden = true;
+      demoRunning = false;
+    }
+
+    if (grasped){
+      reparentPreservingWorld(block, scene);
+      grasped = false;
+    }
+    dragging = false;
+    settling = false;
+    block.position.copy(blockStartPos);
+    block.quaternion.identity();
+
+    state.a1 = HOME.a1; state.a2 = HOME.a2; state.a3 = HOME.a3;
+    state.a4 = HOME.a4; state.a5 = HOME.a5;
+    syncSlidersFromState();
+
+    statusEl.textContent = 'Nein';
+    statusEl.className = 'free';
+  });
+
+  // ---------------------------------------------------------------------
+  // Sicherheits-Warnton (Web Audio, kein externes Audiofile nötig)
+  // ---------------------------------------------------------------------
+  var audioCtx = null;
+  var warnIntervalId = null;
+
+  function ensureAudioCtx(){
+    if (!audioCtx){
+      var Ctx = window.AudioContext || window.webkitAudioContext;
+      if (Ctx) audioCtx = new Ctx();
+    }
+    return audioCtx;
+  }
+  // Browser verweigern Ton ohne Nutzer-Geste; sobald irgendwo geklickt oder
+  // getippt wird, wird der (evtl. schon laufende) Kontext freigegeben.
+  ['pointerdown', 'keydown'].forEach(function(evt){
+    document.addEventListener(evt, function(){
+      var ctx = ensureAudioCtx();
+      if (ctx && ctx.state === 'suspended') ctx.resume().catch(function(){});
+    }, { once: true });
+  });
+
+  function beepOnce(){
+    var ctx = ensureAudioCtx();
+    if (!ctx || ctx.state === 'suspended') return;
+    var osc = ctx.createOscillator();
+    var gain = ctx.createGain();
+    osc.type = 'square';
+    osc.frequency.value = 1000;
+    gain.gain.setValueAtTime(0, ctx.currentTime);
+    gain.gain.linearRampToValueAtTime(0.1, ctx.currentTime + 0.01);
+    gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.16);
+    osc.connect(gain).connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.18);
+  }
+
+  function startWarningTone(){
+    var ctx = ensureAudioCtx();
+    if (ctx && ctx.state === 'suspended') ctx.resume().catch(function(){});
+    beepOnce();
+    warnIntervalId = setInterval(beepOnce, 500);
+  }
+
+  function stopWarningTone(){
+    if (warnIntervalId){ clearInterval(warnIntervalId); warnIntervalId = null; }
+  }
+
+  // ---------------------------------------------------------------------
+  // Autonome Start-Demo: fährt zum Klotz, greift ihn, fährt woanders hin und
+  // lässt ihn fallen. Immer nur eine Achse gleichzeitig, je 2 Sekunden.
+  // ---------------------------------------------------------------------
+  var demoRunning = false;
+  var demoCancelled = false;
+  var demoBanner = document.getElementById('demo-banner');
+  var DEMO_STEP_DURATION = 2000;
+
+  // Handgerechnete Kinematik-Winkel sind fehleranfällig. Statt dessen wird
+  // numerisch gelöst (Koordinatenabstieg auf Basis der echten Vorwärts-
+  // kinematik der Szene), und zwar in zwei sauber getrennten Phasen, wie
+  // ein Mensch es auch tun würde: erst die Basis exakt auf den Klotz
+  // ausrichten (reine Azimut-Formel, unabhängig von der Höhe), dann Schulter
+  // und Ellbogen so lösen, dass der Greifer erst über dem Klotz schwebt und
+  // danach senkrecht darüber abgesenkt wird.
+  function tcpDistanceToPoint(a1v, a2v, a3v, targetPoint){
+    applyCandidatePose({ a1: a1v, a2: a2v, a3: a3v, a4: 0, a5: state.a5 });
+    tcp.getWorldPosition(tmpTcpWorldForGrabCheck);
+    return tmpTcpWorldForGrabCheck.distanceTo(targetPoint);
+  }
+
+  // "Compass search" mit 8 Nachbarrichtungen (statt nur 4 achsparallelen) –
+  // reine Koordinatenschritte bleiben sonst leicht an einem Grat hängen,
+  // bevor sie das echte Minimum erreichen (Ellbogen/Schulter-Landschaft ist
+  // nicht entlang jeder Achse einzeln konvex).
+  function searchA2A3FromStart(a1Fixed, targetPoint, a2Start, a3Start){
+    var a2v = a2Start, a3v = a3Start;
+    var best = tcpDistanceToPoint(a1Fixed, a2v, a3v, targetPoint);
+    var step = 32;
+    for (var pass = 0; pass < 12; pass++){
+      var improved = true;
+      while (improved){
+        improved = false;
+        var offsets = [
+          [step, 0], [-step, 0], [0, step], [0, -step],
+          [step, step], [step, -step], [-step, step], [-step, -step]
+        ];
+        var bestCandidate = null;
+        offsets.forEach(function(o){
+          var c2 = clamp(a2v + o[0], -90, 90);
+          var c3 = clamp(a3v + o[1], -120, 120);
+          var d = tcpDistanceToPoint(a1Fixed, c2, c3, targetPoint);
+          if (d < best){
+            best = d; bestCandidate = [c2, c3];
+          }
+        });
+        if (bestCandidate){
+          a2v = bestCandidate[0]; a3v = bestCandidate[1]; improved = true;
+        }
+      }
+      step /= 2;
+    }
+    return { a2: a2v, a3: a3v, dist: best };
+  }
+
+  // Mehrere Startpunkte probieren und den besten behalten, damit ein
+  // ungünstiger Startwert nicht in einem schlechten lokalen Minimum endet.
+  function solveA2A3ForPoint(a1Fixed, targetPoint, a2Guess, a3Guess){
+    var starts = [
+      [a2Guess, a3Guess],
+      [-20, -40], [-60, -40], [-40, 40], [-70, 90], [-30, -100], [0, 0]
+    ];
+    var overallBest = null;
+    starts.forEach(function(s){
+      var r = searchA2A3FromStart(a1Fixed, targetPoint, s[0], s[1]);
+      if (!overallBest || r.dist < overallBest.dist) overallBest = r;
+    });
+    return { a2: Math.round(overallBest.a2), a3: Math.round(overallBest.a3), dist: overallBest.dist };
+  }
+
+  function buildDemoSteps(){
+    var blockWorld = new THREE.Vector3();
+    block.getWorldPosition(blockWorld);
+
+    // Exakte Basis-Ausrichtung auf den Klotz (reine Richtung, unabhängig
+    // von Reichweite/Höhe – kein numerisches Lösen nötig).
+    var a1Target = Math.round(clamp(
+      THREE.MathUtils.radToDeg(Math.atan2(-blockWorld.z, blockWorld.x)), -180, 180
+    ));
+
+    var hoverPoint = blockWorld.clone();
+    hoverPoint.y += 0.9; // deutlich über dem Klotz schweben, Zange noch offen
+    var hover = solveA2A3ForPoint(a1Target, hoverPoint, -40, 20);
+    // Greifpunkt knapp über der Klotzmitte, damit die Backenspitzen beim
+    // Schließen nicht den Boden berühren. Von der Schwebe-Pose aus suchen,
+    // damit das Senken ein kurzer, direkter Weg bleibt.
+    var graspPoint = blockWorld.clone();
+    graspPoint.y += 0.05;
+    var grasp = solveA2A3ForPoint(a1Target, graspPoint, hover.a2, hover.a3);
+    var roll = solveGripperRoll({ a1: a1Target, a2: grasp.a2, a3: grasp.a3, a5: 60 });
+
+    // Ablageort: 130° weiter gedreht, Klotz knapp über dem Boden loslassen.
+    var a1Drop = Math.round(clamp(a1Target + 130, -180, 180));
+    var dropRad = THREE.MathUtils.degToRad(a1Drop);
+    var dropReach = 2.8;
+    var dropPoint = new THREE.Vector3(Math.cos(dropRad) * dropReach, 0.35, -Math.sin(dropRad) * dropReach);
+    var drop = solveA2A3ForPoint(a1Drop, dropPoint, hover.a2, hover.a3);
+
+    var steps = [
+      { axis: 'a1', to: a1Target },     // Basis exakt zum Klotz drehen
+      { axis: 'a5', to: 60 },           // Zange weit öffnen
+      { axis: 'a2', to: hover.a2 },
+      { axis: 'a3', to: hover.a3 },     // über dem Klotz ausrichten
+      { axis: 'a4', to: roll },         // Zange drehen: Backen waagerecht beidseits des Klotzes
+      { axis: 'a2', to: grasp.a2 },
+      { axis: 'a3', to: grasp.a3 },     // über den Klotz absenken
+      { axis: 'a5', to: 0 },            // Zange schließen -> greifen
+      { axis: 'a2', to: hover.a2 },     // sofort wieder anheben (Umkehr des Absenkens)
+      { axis: 'a3', to: hover.a3 },
+      { axis: 'a1', to: a1Drop },       // zum Ablageort drehen
+      { axis: 'a2', to: drop.a2 },
+      { axis: 'a3', to: drop.a3 },      // knapp über dem Boden absenken
+      { axis: 'a5', to: 60 },           // loslassen – Klotz legt sich flach ab
+      { axis: 'a3', to: 50 },           // zurück in Ruhestellung
+      { axis: 'a2', to: -25 },
+      { axis: 'a4', to: 0 },
+      { axis: 'a1', to: 0 },
+      { axis: 'a5', to: 30 }
+    ];
+
+    // Schritte ohne echte Bewegung weglassen, statt 2 s still zu stehen.
+    var sim = Object.assign({}, state);
+    return steps.filter(function(s){
+      var moves = Math.abs(sim[s.axis] - s.to) >= 1;
+      sim[s.axis] = s.to;
+      return moves;
+    });
+  }
+
+  // Greiferdrehung (Achse 4) so wählen, dass die Öffnungsrichtung der Backen
+  // waagerecht liegt und möglichst parallel zu einer Klotzkante zeigt – dann
+  // kommt der Klotz beim Absenken sauber zwischen die Backen.
+  function solveGripperRoll(pose){
+    var blockYaw = new THREE.Euler().setFromQuaternion(block.quaternion, 'YXZ').y;
+    var pL = new THREE.Vector3(), pR = new THREE.Vector3();
+    var bestRoll = 0, bestCost = Infinity;
+    for (var r = -180; r <= 180; r += 1){
+      applyCandidatePose({ a1: pose.a1, a2: pose.a2, a3: pose.a3, a4: r, a5: pose.a5 });
+      jawPivotL.getWorldPosition(pL);
+      jawPivotR.getWorldPosition(pR);
+      var axis = pL.sub(pR).normalize();
+      var tilt = Math.abs(axis.y);
+      var az = Math.atan2(axis.z, axis.x) - blockYaw;
+      var quarter = Math.PI / 2;
+      var faceMis = Math.abs(az - Math.round(az / quarter) * quarter);
+      var cost = tilt + 0.3 * faceMis + 0.001 * Math.abs(r);
+      if (cost < bestCost){ bestCost = cost; bestRoll = r; }
+    }
+    return bestRoll;
+  }
+
+  function setSlidersDisabled(disabled){
+    Object.keys(sliderEls).forEach(function(key){ sliderEls[key].disabled = disabled; });
+  }
+
+  function easeInOutQuad(t){
+    return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+  }
+
+  // Wie beim manuellen Regler gilt auch während der Demo die Kollisions-
+  // sperre: ein Achsen-Schritt darf nicht tiefer in Boden oder Klotz
+  // hineinfahren, außer die Bewegung würde gerade den Klotz greifen.
+  function tweenAxis(key, target, duration){
+    return new Promise(function(resolve){
+      var from = state[key];
+      var startTime = null;
+      var blockedFlashed = false;
+      function step(now){
+        if (demoCancelled){ resolve(); return; }
+        if (startTime === null) startTime = now;
+        var t = clamp((now - startTime) / duration, 0, 1);
+        var candidateValue = from + (target - from) * easeInOutQuad(t);
+        var candidateState = Object.assign({}, state);
+        candidateState[key] = candidateValue;
+
+        var allowed = true;
+        if (!wouldTriggerGrab(candidateState)){
+          var oldClearance = computeClearance(state);
+          var newClearance = computeClearance(candidateState);
+          if (newClearance < 0 && newClearance < oldClearance){
+            allowed = false;
+          }
+        }
+
+        if (allowed){
+          state[key] = candidateValue;
+          sliderEls[key].value = state[key];
+          valueEls[key].textContent = formatValue(key, Math.round(state[key]));
+        } else {
+          applyStateToRobot(); // Pose auf letzten gültigen Stand zurücksetzen
+          if (!blockedFlashed){
+            blockedFlashed = true;
+            flashCollision(key);
+          }
+        }
+
+        if (t < 1){
+          requestAnimationFrame(step);
+        } else {
+          resolve();
+        }
+      }
+      requestAnimationFrame(step);
+    });
+  }
+
+  function runIntroDemo(){
+    demoRunning = true;
+    demoCancelled = false;
+    setSlidersDisabled(true);
+    demoBanner.hidden = false;
+    startWarningTone();
+
+    var steps = buildDemoSteps();
+    var chain = Promise.resolve();
+    steps.forEach(function(s){
+      chain = chain.then(function(){
+        if (demoCancelled) return;
+        return tweenAxis(s.axis, s.to, DEMO_STEP_DURATION);
+      });
+    });
+    chain.then(function(){
+      stopWarningTone();
+      setSlidersDisabled(false);
+      demoBanner.hidden = true;
+      demoRunning = false;
+    });
+  }
+
+  // ---------------------------------------------------------------------
+  // Kamera-Monitor: zweiter, kleiner Renderer für das Bild der Greiferkamera
+  // ---------------------------------------------------------------------
+  var camCanvas = document.getElementById('cam-canvas');
+  var camRenderer = new THREE.WebGLRenderer({ canvas: camCanvas, antialias: true });
+  camRenderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+
+  function resizeCamRendererToDisplaySize(){
+    var w = camCanvas.clientWidth;
+    var h = camCanvas.clientHeight;
+    if (w === 0 || h === 0) return;
+    camRenderer.setSize(w, h, false);
+    gripperCam.aspect = w / h;
+    gripperCam.updateProjectionMatrix();
+  }
+
+  if (typeof ResizeObserver !== 'undefined'){
+    new ResizeObserver(resizeCamRendererToDisplaySize).observe(camCanvas);
+  } else {
+    window.addEventListener('resize', resizeCamRendererToDisplaySize);
+  }
+  resizeCamRendererToDisplaySize();
+
+  // ---------------------------------------------------------------------
+  // Resize-Handling
+  // ---------------------------------------------------------------------
+  function resizeRendererToDisplaySize(){
+    var w = canvas.clientWidth;
+    var h = canvas.clientHeight;
+    if (w === 0 || h === 0) return;
+    renderer.setSize(w, h, false);
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+  }
+
+  if (typeof ResizeObserver !== 'undefined'){
+    new ResizeObserver(resizeRendererToDisplaySize).observe(canvas);
+  } else {
+    window.addEventListener('resize', resizeRendererToDisplaySize);
+  }
+  resizeRendererToDisplaySize();
+
+  // ---------------------------------------------------------------------
+  // Render-Loop
+  // ---------------------------------------------------------------------
+  function animate(){
+    requestAnimationFrame(animate);
+    applyStateToRobot();
+    updateGrabLogic();
+    updateSettleTween();
+    updateCameraPosition();
+    renderer.render(scene, camera);
+    camRenderer.render(scene, gripperCam);
+  }
+  animate();
+
+  runIntroDemo();
+
+})();
+</script>
+</body>
+</html>
