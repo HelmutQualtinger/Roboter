@@ -744,7 +744,9 @@
   camLens.position.set(0, CAM_FACE_Y + 0.015, 0);
   wristRoll.add(camLens);
 
-  var gripperCam = new THREE.PerspectiveCamera(62, 4 / 3, 0.05, 30);
+  // far über 500 hinaus, sonst wird die Sternenhimmel-Kugel (Radius 500)
+  // aus dieser Kamera herausgeschnitten und der Monitor bleibt schwarz.
+  var gripperCam = new THREE.PerspectiveCamera(62, 4 / 3, 0.05, 600);
   gripperCam.position.set(0, CAM_FACE_Y + 0.06, 0);
   gripperCam.rotation.x = Math.PI / 2;
   wristRoll.add(gripperCam);
