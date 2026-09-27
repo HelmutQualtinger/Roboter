@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>5-Achsen Roboterarm Simulator</title>
+<style>
+  :root{
+    --bg: #0d1117;
+    --panel-bg: #161b22;
+    --panel-border: #30363d;
+    --text: #e6edf3;
+    --text-dim: #8b949e;
+    --accent: #ffb020;
+    --accent-dim: #7a5a1f;
+  }
+  *{ box-sizing: border-box; }
+  html, body{
+    margin: 0;
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .card{
+    max-width: 420px;
+    margin: 1.5rem;
+    padding: 1.75rem 1.9rem 2rem;
+    background: var(--panel-bg);
+    border: 1px solid var(--panel-border);
+    border-radius: 12px;
+    text-align: center;
+  }
+  h1{
+    font-size: 1.2rem;
+    letter-spacing: 0.02em;
+    margin: 0 0 0.6rem;
+  }
+  p{
+    font-size: 0.85rem;
+    line-height: 1.5;
+    color: var(--text-dim);
+    margin: 0 0 1.4rem;
+  }
+  a.start-btn{
+    display: inline-block;
+    padding: 0.7rem 1.4rem;
+    border-radius: 8px;
+    border: 1px solid var(--accent-dim);
+    background: #1e1608;
+    color: var(--accent);
+    font-size: 0.9rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-decoration: none;
+    transition: background 0.15s ease;
+  }
+  a.start-btn:hover{ background: #2a1e0c; }
+  a.start-btn:active{ background: #3a2a10; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <h1>5-Achsen Roboterarm Simulator</h1>
+    <p>Browserbasierter Greifarm-Simulator mit three.js: Kollisionserkennung, Greiferkamera und automatischem Pick-up.</p>
+    <a class="start-btn" href="robot-arm.html">Simulator öffnen</a>
+  </div>
+</body>
+</html>
