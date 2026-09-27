@@ -30,6 +30,7 @@ python3 -m http.server 8000
 Anschließend `http://localhost:8000/robot-arm.html` im Browser aufrufen.
 
 **Bedienung:**
+
 - Mit der Maus im 3D-Bild ziehen, um die Kamera zu drehen; scrollen zum Zoomen.
 - Den roten Klotz direkt mit der Maus verschieben, solange er nicht gegriffen ist.
 - Zum Greifen: Zange schließen (Achse 5 nahe 0 %), während die Greiferspitze nah am Klotz ist.

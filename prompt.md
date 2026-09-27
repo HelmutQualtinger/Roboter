@@ -8,14 +8,13 @@ Konstruiere einen Roboter mit 5 achsen. ein greifarm mit zwei gelenken der um se
 
 zeige den Greifarm in thuseree.js. für jede Achse ist ein Regler vor gesehen. Zeigen am boden einen bewegbaren klotz, der greifbar ist.
 
-
 ## prompt 2
 
 erkenne eien kollision des greifers mit dem fussboden und dem kubus. blockiere bei kollision und erlaube nor ein zurückfahren. mache den kubus klein genug um gegriffen werden zu können
 
 ## prompt 3
- 
-machen den boden sichtbar mit einem struktiiertem eisernen gitter, befestige eine kamera am
+
+ machen den boden sichtbar mit einem struktiiertem eisernen gitter, befestige eine kamera am
 greifarm. ein kleiner bildschirm rechts oben, zeigt das bild der kamera
 
 ## prompt 4
@@ -43,3 +42,4 @@ er findet den klotz nicht, die kollisions detektion funktioniert während der fa
 
 ❯ /goal dont stop before you pick up and drop the cube
   ⎿  Goal set: dont stop before you pick up and drop the cube
+  

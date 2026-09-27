@@ -2,7 +2,7 @@
 
 **Datum:** 2026-09-27
 **Projektordner:** `/Users/haraldbeker/Roboter`
-**Dateien:** `prompt.md` (Aufgabenstellung), `robot-arm.html` (Ergebnis, eigenständige Seite)
+**Dateien:** `prompt.md` (Aufgabenstellung), `robot-arm.html` (Ergebnis, eigenständige Seite), `index.html` (Landingpage), `README.md`, `social-preview.png`
 
 ## Aufgabenstellung (aus `prompt.md`)
 
@@ -20,13 +20,16 @@
 5. Langsame **Pick-up-Demo**: eine Achse nach der anderen, je 2 Sekunden, mit Sicherheits-Warnton.
 6. Demo-Choreografie verfeinert: über dem Würfel ausrichten, Zange so drehen, dass die Backen waagerecht beidseits des Würfels stehen, absenken, schließen, sofort anheben; beim Loslassen legt sich der Würfel flach auf den Boden.
 7. Kein Autostart mehr – Demo startet per Button **„Pick-up starten“**.
+8. Auf **GitHub Pages** veröffentlicht (`https://helmutqualtinger.github.io/Roboter/`).
+9. **Social-Media-Vorschau**: Open-Graph-/Twitter-Bild und -Beschreibung hinterlegt.
+10. **Sternenhimmel mit Galaxien** als Hintergrund statt flacher Farbe.
 
 ## Aktueller Stand von `robot-arm.html`
 
 ### Achsen
 
 | Achse | Funktion | Bereich |
-|---|---|---|
+| --- | --- | --- |
 | 1 | Basisdrehung (um Hochachse) | −180° … 180° |
 | 2 | Schulter | −90° … 90° |
 | 3 | Ellbogen | −120° … 120° |
@@ -40,6 +43,7 @@
 - **Greifer-Kamera:** am Greifer montiert, Bild oben rechts im 3D-Bereich.
 - **Pick-up-Demo (Button):** Basis zum Würfel → Zange öffnen → über dem Würfel schweben → Zange um −90° drehen (Backen waagerecht) → absenken → schließen → sofort anheben → zum Ablageort (+130°) drehen → knapp über dem Boden absenken → loslassen → zurück in Ruhestellung. Warnton (Web Audio) läuft währenddessen, Regler sind gesperrt, Reset bricht ab.
 - **Reset:** Ruhestellung und Würfel an Startposition (3,0 / 0,11 / 0).
+- **Hintergrund:** große, von innen sichtbare Kugel (Radius 500) mit prozedural gezeichneter Himmelstextur (2048×1024 Canvas, kein externes Bild) – ca. 1400 Sterne, drei farbige Spiralgalaxien mit Kern/Scheibe/Spiralarmen, schwaches Milchstraßenband. Vom Nebel ausgenommen (`fog:false`), damit er den Himmel nicht verwäscht; dreht sich mit der Kamera mit.
 
 ## Wichtige Erkenntnisse und behobene Fehler
 
@@ -52,6 +56,8 @@
 - **Anheben nach dem Griff:** Der erste Heben-Schritt bewegte eine Achse, die beim Absenken nicht benutzt wurde → Würfel sank kurz in den Boden. Jetzt wird die Absenkbewegung zuerst umgekehrt.
 - **Banner blieb sichtbar:** `#demo-banner { display: flex }` überschrieb das `hidden`-Attribut → `#demo-banner[hidden] { display: none }`.
 - **Warnton:** Browser blockieren Audio ohne Nutzer-Geste; durch den Start-Button ist das gelöst.
+- **GitHub Pages lieferte 404:** Pages-Quelle stand auf `/docs` (Zweig `main`), diesen Ordner gibt es im Repo nicht. Umgestellt auf Repo-Wurzel (`main`, `/`).
+- **Weißer Fleck im Screenshot:** Headless-Chromium ohne echte GPU (SwiftShader) erzeugte ein Rendering-Artefakt zwischen den beiden WebGL-Kontexten (Haupt- und Greiferkamera). Mit `--use-gl=angle --use-angle=metal --enable-gpu` (echte GPU) verschwunden – kein Bug der Seite selbst, nur des Screenshot-Verfahrens.
 
 ## Verifikation
 
@@ -61,13 +67,28 @@ Mit Playwright (Chromium, headless) im echten Browser geprüft, Testskripte lage
 - Zwei aufeinanderfolgende Button-Läufe: jeweils gegriffen und abgelegt, keine Kollisionssperre ausgelöst, keine Seitenfehler.
 - Würfel landet flach (0° Neigung) auf y = 0,11.
 - Dreifache Wiederholung mit identischem Ergebnis (deterministisch).
+- Live-Version auf GitHub Pages: Startseite und `robot-arm.html` liefern 200, `social-preview.png` liegt als `image/png` vor, Pick-up-Demo direkt auf der veröffentlichten Seite ausgelöst und geprüft (gegriffen + abgelegt, keine Fehler).
+- MD5-Abgleich zwischen lokaler und veröffentlichter `social-preview.png` nach dem Update stimmt exakt überein.
+
+## Veröffentlichung
+
+- **Repo:** `HelmutQualtinger/Roboter` auf GitHub, Branch `main`.
+- **GitHub Pages:** Quelle auf Repo-Wurzel umgestellt (siehe oben); erreichbar unter
+  - `https://helmutqualtinger.github.io/Roboter/` (Startseite `index.html`)
+  - `https://helmutqualtinger.github.io/Roboter/robot-arm.html` (Simulator)
+- **Social-Media-Vorschau:** `social-preview.png` (1200×630, Playwright-Screenshot der laufenden Szene) plus Open-Graph-/Twitter-Meta-Tags (Titel, Beschreibung, Bild) in `index.html` und `robot-arm.html`. Der veraltete `screenshot.png` (zeigte den entfernten Autostart-Banner) wurde entfernt, README entsprechend aktualisiert.
+- GitHubs eigene Repo-Social-Preview (Vorschau beim Teilen des reinen `github.com`-Links) lässt sich nicht per API setzen, nur manuell unter *Settings → General → Social preview*.
 
 ## Bekannte Grenzen / offene Punkte
 
 - Liegt der Würfel außerhalb der erreichbaren Zone (zu nah an der Basis), greift die Demo daneben – es gibt noch keine Meldung dafür.
 - Liegt der Würfel nicht auf der Armachse bzw. ist gedreht, können die Backen nicht gleichzeitig waagerecht und kantenparallel stehen; der Löser wählt dann den besten Kompromiss.
 - Der Würfel sinkt beim Loslassen linear ab (keine echte Physik).
+- Die Orbit-Kamera lässt bei sehr nahem Zoom kombiniert mit starker Neigung ein Abtauchen unter die Bodenplatte zu (man sieht dann die Unterseite des Sockels). Vorbestehend, nicht durch den Sternenhimmel verursacht, noch nicht behoben.
 
 ## Benutzung
 
-`robot-arm.html` direkt im Browser öffnen (Three.js r128 wird von `cdn.jsdelivr.net` geladen, Internet nötig). Regler bedienen, im 3D-Bild ziehen zum Drehen, scrollen zum Zoomen, Würfel mit der Maus verschieben, „Pick-up starten“ für die Demo.
+- **Online:** `https://helmutqualtinger.github.io/Roboter/robot-arm.html`
+- **Lokal:** `robot-arm.html` direkt im Browser öffnen (Three.js r128 wird von `cdn.jsdelivr.net` geladen, Internet nötig).
+
+Regler bedienen, im 3D-Bild ziehen zum Drehen, scrollen zum Zoomen, Würfel mit der Maus verschieben, „Pick-up starten“ für die Demo.
