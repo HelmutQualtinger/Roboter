@@ -414,10 +414,117 @@
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
 
   var scene = new THREE.Scene();
-  scene.background = new THREE.Color(0x0a0e14);
+  scene.background = new THREE.Color(0x02030a);
   scene.fog = new THREE.Fog(0x0a0e14, 12, 26);
 
-  var camera = new THREE.PerspectiveCamera(50, 1, 0.1, 100);
+  // ---------------------------------------------------------------------
+  // Sternenhimmel: große, von innen sichtbare Kugel mit prozeduraler
+  // Sternen-/Galaxientextur. fog:false, damit der Nebel die Szene bodennah
+  // hält, den Himmel dahinter aber nicht zu Matsch verwäscht.
+  // ---------------------------------------------------------------------
+  function createStarfieldTexture(){
+    var w = 2048, h = 1024;
+    var c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    var ctx = c.getContext('2d');
+
+    var bg = ctx.createLinearGradient(0, 0, 0, h);
+    bg.addColorStop(0, '#050611');
+    bg.addColorStop(0.5, '#02030a');
+    bg.addColorStop(1, '#000103');
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, w, h);
+
+    var rng = 987654321;
+    function rand(){ rng = (rng * 16807) % 2147483647; return rng / 2147483647; }
+
+    function drawGalaxy(cx, cy, r, hue, rot){
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(rot);
+      ctx.scale(1, 0.38); // perspektivisch flach wie eine Spiralgalaxie von schräg oben
+
+      // Kern
+      var core = ctx.createRadialGradient(0, 0, 0, 0, 0, r * 0.22);
+      core.addColorStop(0, 'hsla(' + hue + ', 60%, 92%, 0.95)');
+      core.addColorStop(0.4, 'hsla(' + hue + ', 70%, 80%, 0.55)');
+      core.addColorStop(1, 'hsla(' + hue + ', 70%, 70%, 0)');
+      ctx.fillStyle = core;
+      ctx.beginPath(); ctx.arc(0, 0, r * 0.22, 0, Math.PI * 2); ctx.fill();
+
+      // Diffuse Scheibe
+      var disk = ctx.createRadialGradient(0, 0, 0, 0, 0, r);
+      disk.addColorStop(0, 'hsla(' + hue + ', 65%, 75%, 0.35)');
+      disk.addColorStop(0.5, 'hsla(' + (hue + 15) + ', 70%, 60%, 0.16)');
+      disk.addColorStop(1, 'hsla(' + (hue + 15) + ', 70%, 60%, 0)');
+      ctx.fillStyle = disk;
+      ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
+
+      // Spiralarme aus feinen Punktwolken
+      ctx.globalCompositeOperation = 'lighter';
+      for (var arm = 0; arm < 2; arm++){
+        var armOffset = arm * Math.PI;
+        for (var i = 0; i < 260; i++){
+          var t = i / 260;
+          var theta = t * Math.PI * 2.4 + armOffset;
+          var radius = t * r;
+          var spread = (rand() - 0.5) * r * 0.16 * (0.3 + t);
+          var x = Math.cos(theta) * radius + Math.cos(theta + Math.PI / 2) * spread;
+          var y = Math.sin(theta) * radius + Math.sin(theta + Math.PI / 2) * spread;
+          var s = (1 - t) * 2.6 + 0.4;
+          ctx.fillStyle = 'hsla(' + (hue + rand() * 20 - 10) + ', 75%, ' + (70 + rand() * 20) + '%, ' + (0.5 - t * 0.35).toFixed(2) + ')';
+          ctx.beginPath(); ctx.arc(x, y, s, 0, Math.PI * 2); ctx.fill();
+        }
+      }
+      ctx.restore();
+    }
+
+    // 3 unterschiedlich große, unterschiedlich gefärbte Galaxien verteilt
+    drawGalaxy(w * 0.22, h * 0.28, 170, 265, 0.6);
+    drawGalaxy(w * 0.78, h * 0.62, 230, 205, -0.9);
+    drawGalaxy(w * 0.55, h * 0.15, 110, 320, 0.2);
+
+    // Schwaches Milchstraßenband quer über den Himmel
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.translate(w * 0.5, h * 0.82);
+    ctx.rotate(-0.12);
+    var band = ctx.createLinearGradient(0, -70, 0, 70);
+    band.addColorStop(0, 'hsla(230, 40%, 70%, 0)');
+    band.addColorStop(0.5, 'hsla(230, 35%, 80%, 0.10)');
+    band.addColorStop(1, 'hsla(230, 40%, 70%, 0)');
+    ctx.fillStyle = band;
+    ctx.fillRect(-w * 0.6, -70, w * 1.2, 140);
+    ctx.restore();
+
+    // Sternenfeld: viele kleine, ein paar größere mit Glanzpunkt
+    for (var i = 0; i < 1400; i++){
+      var x = rand() * w, y = rand() * h;
+      var b = rand();
+      var radius = b > 0.985 ? 1.6 + rand() * 1.2 : (b > 0.9 ? 0.9 + rand() * 0.6 : 0.35 + rand() * 0.4);
+      var alpha = 0.35 + rand() * 0.65;
+      var tint = rand() > 0.8 ? '200, 220, 255' : (rand() > 0.5 ? '255, 250, 240' : '255, 255, 255');
+      ctx.fillStyle = 'rgba(' + tint + ', ' + alpha.toFixed(2) + ')';
+      ctx.beginPath(); ctx.arc(x, y, radius, 0, Math.PI * 2); ctx.fill();
+      if (radius > 1.6){
+        ctx.strokeStyle = 'rgba(' + tint + ', ' + (alpha * 0.3).toFixed(2) + ')';
+        ctx.lineWidth = 0.6;
+        ctx.beginPath(); ctx.moveTo(x - radius * 3, y); ctx.lineTo(x + radius * 3, y); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(x, y - radius * 3); ctx.lineTo(x, y + radius * 3); ctx.stroke();
+      }
+    }
+
+    return c;
+  }
+
+  var starfieldTexture = new THREE.CanvasTexture(createStarfieldTexture());
+  var starfield = new THREE.Mesh(
+    new THREE.SphereGeometry(500, 48, 32),
+    new THREE.MeshBasicMaterial({ map: starfieldTexture, side: THREE.BackSide, fog: false, depthWrite: false })
+  );
+  scene.add(starfield);
+
+  var camera = new THREE.PerspectiveCamera(50, 1, 0.1, 700);
 
   // Manuelle "Orbit"-Kamera (kein OrbitControls-Import nötig)
   var cam = {
