@@ -2,7 +2,7 @@
 
 Ein browserbasierter Simulator für einen 5-achsigen Greifarm, gebaut mit [three.js](https://threejs.org/). Alles steckt in einer einzigen Datei (`robot-arm.html`) – kein Build-Schritt, keine Abhängigkeiten außer der three.js-CDN.
 
-![Screenshot des Roboterarm-Simulators](screenshot.png)
+![Screenshot des Roboterarm-Simulators](social-preview.png)
 
 ## Funktionen
 
@@ -11,7 +11,7 @@ Ein browserbasierter Simulator für einen 5-achsigen Greifarm, gebaut mit [three
 - **Kollisionserkennung** zwischen Greifer, Boden und Klotz – eine Bewegung, die tiefer in eine Kollision hineinführen würde, wird blockiert; nur ein Zurückfahren ist erlaubt.
 - **Kamera am Greifer** montiert, mittig zwischen den Zangenbacken; das Live-Bild erscheint im kleinen Monitor oben rechts.
 - **Schachbrett-Boden** aus prozedural erzeugten Stahlplatten mit Fugenlinien und Rostspuren.
-- **Autonome Demo** beim Laden der Seite: Der Arm fährt langsam (eine Achse nach der anderen, je 2 Sekunden) zum Klotz, greift ihn, legt ihn an anderer Stelle ab – begleitet von einem akustischen Sicherheits-Warnton.
+- **Pick-up-Demo per Knopfdruck**: Der Arm fährt langsam (eine Achse nach der anderen, je 2 Sekunden) zum Klotz, greift ihn, legt ihn an anderer Stelle ab – begleitet von einem akustischen Sicherheits-Warnton.
 
 ## Verwendung
 
@@ -34,7 +34,7 @@ Anschließend `http://localhost:8000/robot-arm.html` im Browser aufrufen.
 - Den roten Klotz direkt mit der Maus verschieben, solange er nicht gegriffen ist.
 - Zum Greifen: Zange schließen (Achse 5 nahe 0 %), während die Greiferspitze nah am Klotz ist.
 - Zum Loslassen: Zange öffnen.
-- „Reset“ setzt Arm und Klotz auf die Ausgangsposition zurück.
+- „Pick-up starten“ löst die automatische Demo aus; „Reset“ setzt Arm und Klotz auf die Ausgangsposition zurück (bricht eine laufende Demo ab).
 
 ## Struktur
 
