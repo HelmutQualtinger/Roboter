@@ -24,9 +24,15 @@ Everything is one IIFE in `robot-arm.html`. Key pieces, in dependency order:
 
 **Grasp logic**: `updateGrabLogic()` runs every frame, not just on slider input (this matters for the autonomous demo, where the block must be detected as grabbed while joints are still tweening). Grasping re-parents the block mesh onto `wristRoll` via `reparentPreservingWorld()` (decomposes world matrix into the new parent's local space) so it moves rigidly with the gripper; releasing re-parents back to `scene` and starts a short `settling` tween that drops the block to the floor.
 
+**Grasp object**: `block` is a dodecahedron (`DodecahedronGeometry`, one vertex color per pentagon face, rotated so a face points down and it rests flat at y = `BLOCK_SIZE`/2). Its face-to-face width equals `BLOCK_SIZE`; the gripper-roll solver still assumes cube-like 90° symmetry.
+
+**Saturn**: `saturnSystem` (planet, ring, three moons on individually tilted orbit planes with line loops) sits at the zenith (`SATURN_Y`); `updateSaturn()` animates the moons each frame. All materials are `MeshBasicMaterial` with `fog:false`.
+
 **Gripper camera**: `gripperCam` is a second `THREE.PerspectiveCamera` parented to `wristRoll`, positioned at the jaw hinge line looking down the gripper's local +Y (same direction as the TCP), rendered into a second `THREE.WebGLRenderer` targeting the small `#cam-canvas` monitor. Both renderers render the same `scene` every frame in `animate()`.
 
-**Intro demo**: `buildDemoSteps()` computes the sequence of single-axis moves (approach → hover → descend → grasp → move → release → return) using numerical inverse kinematics (`solveA2A3ForPoint`, a coordinate-descent search over a2/a3 against the real forward kinematics — not a closed-form solution) rather than hand-derived angles. `runIntroDemo()` then plays these steps one axis at a time via `tweenAxis()`, which respects the same collision-clearance rule as manual slider input, disables the sliders, shows the demo banner, and drives a Web Audio warning tone (`startWarningTone`/`stopWarningTone`) — audio only starts after a user gesture unlocks the `AudioContext`, per browser autoplay policy.
+**Intro demo**: `buildDemoSteps()` computes the sequence of single-axis moves (approach → hover → descend → grasp → move → release → return → point at Saturn) using numerical inverse kinematics (`solveA2A3ForPoint`, a coordinate-descent search over a2/a3 against the real forward kinematics — not a closed-form solution) rather than hand-derived angles. `runIntroDemo()` then plays these steps one axis at a time via `tweenAxis()`, which respects the same collision-clearance rule as manual slider input, disables the sliders, shows the demo banner, and drives a Web Audio warning tone (`startWarningTone`/`stopWarningTone`) — audio only starts after a user gesture unlocks the `AudioContext`, per browser autoplay policy.
+
+**Demo finale / camera zoom**: after returning home, `solvePointAtSaturn()` (coarse + fine grid search over a1–a3) aims the gripper axis at Saturn, then `zoomGripperCam()` tweens the gripper-camera zoom until the outermost moon orbit fills `SATURN_FRAME_FILL` of the view. `setGripperZoom()` is the single place that sets `gripperCam.fov` and syncs the `#cam-zoom` slider (log scale 1×–10×); reset and demo start call `resetGripperCamZoom()`.
 
 ## Conventions specific to this file
 

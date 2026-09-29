@@ -159,13 +159,17 @@
   #panel .subtitle{
     font-size: 0.78rem;
     color: var(--text-dim);
-    margin: 0 0 1.3rem;
+    margin: 0 0 0.8rem;
     line-height: 1.4;
   }
 
   .axis-block{
-    margin-bottom: 1.15rem;
-    padding: 0.7rem 0.8rem 0.8rem;
+    display: grid;
+    grid-template-columns: 6.2em 1fr 3.2em;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.4rem;
+    padding: 0.35rem 0.7rem;
     background: #10151c;
     border: 1px solid var(--panel-border);
     border-radius: 8px;
@@ -176,23 +180,19 @@
     background: #1c1013;
     box-shadow: 0 0 0 1px rgba(248, 81, 73, 0.35);
   }
-  .axis-row{
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    margin-bottom: 0.45rem;
-  }
+  .axis-row{ display: contents; }
   .axis-label{
-    font-size: 0.82rem;
+    font-size: 0.78rem;
     font-weight: 600;
     color: var(--text);
+    white-space: nowrap;
   }
   .axis-value{
     font-variant-numeric: tabular-nums;
-    font-size: 0.85rem;
+    font-size: 0.8rem;
     color: var(--accent);
     font-weight: 700;
-    min-width: 3.6em;
+    grid-column: 3;
     text-align: right;
   }
 
@@ -344,47 +344,50 @@
 
     <div class="axis-block">
       <div class="axis-row">
-        <span class="axis-label">Achse 1 &ndash; Basisdrehung</span>
+        <span class="axis-label">A1 Basis</span>
+        <input type="range" id="axis1" min="-180" max="180" step="1" value="0">
         <span class="axis-value" id="val-axis1">0&deg;</span>
       </div>
-      <input type="range" id="axis1" min="-180" max="180" step="1" value="0">
-      <div class="range-endcaps"><span>-180&deg;</span><span>180&deg;</span></div>
     </div>
 
     <div class="axis-block">
       <div class="axis-row">
-        <span class="axis-label">Achse 2 &ndash; Schulter</span>
+        <span class="axis-label">A2 Schulter</span>
+        <input type="range" id="axis2" min="-90" max="90" step="1" value="-25">
         <span class="axis-value" id="val-axis2">0&deg;</span>
       </div>
-      <input type="range" id="axis2" min="-90" max="90" step="1" value="-25">
-      <div class="range-endcaps"><span>-90&deg;</span><span>90&deg;</span></div>
     </div>
 
     <div class="axis-block">
       <div class="axis-row">
-        <span class="axis-label">Achse 3 &ndash; Ellbogen</span>
+        <span class="axis-label">A3 Ellbogen</span>
+        <input type="range" id="axis3" min="-120" max="120" step="1" value="50">
         <span class="axis-value" id="val-axis3">0&deg;</span>
       </div>
-      <input type="range" id="axis3" min="-120" max="120" step="1" value="50">
-      <div class="range-endcaps"><span>-120&deg;</span><span>120&deg;</span></div>
     </div>
 
     <div class="axis-block">
       <div class="axis-row">
-        <span class="axis-label">Achse 4 &ndash; Greiferdrehung</span>
+        <span class="axis-label">A4 Greiferdreh.</span>
+        <input type="range" id="axis4" min="-180" max="180" step="1" value="0">
         <span class="axis-value" id="val-axis4">0&deg;</span>
       </div>
-      <input type="range" id="axis4" min="-180" max="180" step="1" value="0">
-      <div class="range-endcaps"><span>-180&deg;</span><span>180&deg;</span></div>
     </div>
 
     <div class="axis-block">
       <div class="axis-row">
-        <span class="axis-label">Achse 5 &ndash; Zange</span>
+        <span class="axis-label">A5 Zange</span>
+        <input type="range" id="axis5" min="0" max="100" step="1" value="30">
         <span class="axis-value" id="val-axis5">30%</span>
       </div>
-      <input type="range" id="axis5" min="0" max="100" step="1" value="30">
-      <div class="range-endcaps"><span>geschlossen</span><span>offen</span></div>
+    </div>
+
+    <div class="axis-block">
+      <div class="axis-row">
+        <span class="axis-label">Kamerazoom</span>
+        <input type="range" id="cam-zoom" min="0" max="100" step="1" value="0">
+        <span class="axis-value" id="val-cam-zoom">1,0&times;</span>
+      </div>
     </div>
 
     <div class="status-block">
@@ -525,6 +528,99 @@
     new THREE.MeshBasicMaterial({ map: starfieldTexture, side: THREE.BackSide, fog: false, depthWrite: false })
   );
   scene.add(starfield);
+
+  // ---------------------------------------------------------------------
+  // Saturn im Zenit: gebänderte Kugel, geneigte Ringe, drei Monde auf Bahnen.
+  // MeshBasicMaterial + fog:false, damit er unabhängig von Licht und Bodennebel
+  // gleichmäßig sichtbar bleibt.
+  // ---------------------------------------------------------------------
+  var SATURN_R = 4;
+  var SATURN_Y = 100; // weit genug weg, damit der Endzoom das ganze System einrahmt
+  var saturnSystem = new THREE.Group();
+  saturnSystem.position.set(0, SATURN_Y, 0);
+  saturnSystem.rotation.set(1.0, 0, 0.35); // starke Schrägstellung von Planet, Ringen und Bahnen
+  scene.add(saturnSystem);
+
+  var saturnPlanet;
+  (function(){
+    // Bänder der Planetenoberfläche (v: Nordpol -> Südpol)
+    var c = document.createElement('canvas');
+    c.width = 8; c.height = 256;
+    var ctx = c.getContext('2d');
+    var bands = ['#c9a86a', '#e3c98f', '#b8965a', '#dcc08a', '#a98753', '#e8d3a0', '#c2a068', '#d6b97e'];
+    for (var y = 0; y < 256; y++){
+      var bi = Math.floor(y / 14 + Math.sin(y / 9));
+      ctx.fillStyle = bands[((bi % bands.length) + bands.length) % bands.length];
+      ctx.fillRect(0, y, 8, 1);
+    }
+    saturnPlanet = new THREE.Mesh(
+      new THREE.SphereGeometry(SATURN_R, 48, 32),
+      new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(c), fog: false })
+    );
+    saturnSystem.add(saturnPlanet);
+
+    // Ringe: radiale Textur mit Lücken (Cassini-Teilung)
+    var rc = document.createElement('canvas');
+    rc.width = 256; rc.height = 1;
+    var rctx = rc.getContext('2d');
+    for (var x = 0; x < 256; x++){
+      var t = x / 255;
+      var a = 0.85 - 0.25 * Math.abs(Math.sin(t * 23));
+      if (t > 0.52 && t < 0.60) a = 0.05;      // Cassini-Teilung
+      if (t < 0.08 || t > 0.94) a *= 0.4;      // ausdünnende Ränder
+      rctx.fillStyle = 'rgba(214, 190, 140, ' + a.toFixed(2) + ')';
+      rctx.fillRect(x, 0, 1, 1);
+    }
+    var RING_IN = SATURN_R * 1.3, RING_OUT = SATURN_R * 2.3;
+    var ringGeo = new THREE.RingGeometry(RING_IN, RING_OUT, 96, 1);
+    var rp = ringGeo.attributes.position, ruv = ringGeo.attributes.uv, v = new THREE.Vector3();
+    for (var k = 0; k < rp.count; k++){
+      v.fromBufferAttribute(rp, k);
+      ruv.setXY(k, (v.length() - RING_IN) / (RING_OUT - RING_IN), 0.5);
+    }
+    var ring = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({
+      map: new THREE.CanvasTexture(rc), side: THREE.DoubleSide, transparent: true, depthWrite: false, fog: false
+    }));
+    ring.rotation.x = -Math.PI / 2; // Ringe in die Äquatorebene legen
+    saturnSystem.add(ring);
+  })();
+
+  // Drei Monde mit unterschiedlicher Bahn, Größe und Umlaufzeit
+  var saturnMoons = [
+    { r: 3.3 * SATURN_R, size: 0.8, speed: 0.55, phase: 0.0, color: 0xd9d9d9 },
+    { r: 4.2 * SATURN_R, size: 1.1, speed: 0.32, phase: 2.1, color: 0xc7a98a },
+    { r: 5.3 * SATURN_R, size: 0.6, speed: 0.20, phase: 4.2, color: 0xbfd3e6 }
+  ].map(function(m, i){
+    // Jede Bahn liegt in einer eigenen, gegen die Ringebene geneigten Ebene
+    // und wird als dünne Linie mitgezeichnet.
+    var tilts = [[0.0, 0.0], [0.5, 0.3], [-0.6, -0.4]];
+    m.orbit = new THREE.Group();
+    m.orbit.rotation.set(tilts[i][0], 0, tilts[i][1]);
+    var pts = [];
+    for (var k = 0; k <= 96; k++){
+      var a = k / 96 * Math.PI * 2;
+      pts.push(new THREE.Vector3(Math.cos(a) * m.r, 0, Math.sin(a) * m.r));
+    }
+    m.orbit.add(new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints(pts),
+      new THREE.LineBasicMaterial({ color: m.color, transparent: true, opacity: 0.45, fog: false })
+    ));
+    m.mesh = new THREE.Mesh(
+      new THREE.SphereGeometry(m.size, 16, 12),
+      new THREE.MeshBasicMaterial({ color: m.color, fog: false })
+    );
+    m.orbit.add(m.mesh);
+    saturnSystem.add(m.orbit);
+    return m;
+  });
+
+  function updateSaturn(timeSec){
+    saturnMoons.forEach(function(m){
+      var ang = m.phase + timeSec * m.speed;
+      m.mesh.position.set(Math.cos(ang) * m.r, 0, Math.sin(ang) * m.r);
+    });
+    saturnPlanet.rotation.y = timeSec * 0.1;
+  }
 
   var camera = new THREE.PerspectiveCamera(50, 1, 0.1, 700);
 
@@ -788,14 +884,39 @@
   // ---------------------------------------------------------------------
   // Klein genug, um zwischen den Backen der Zange zu passen (siehe Greif- und
   // Kollisionslogik weiter unten, die auf diese Gr&ouml;&szlig;e abgestimmt ist).
-  var BLOCK_SIZE = 0.22;
+  var BLOCK_SIZE = 0.3;
   // Knapp über der halben Kantenlänge statt der vollen Raumdiagonale: eine
   // großzügigere Kugel würde schon "Kollision" melden, wenn der Greifer noch
   // ein gutes Stück von der tatsächlichen Würfeloberfläche entfernt ist.
   var BLOCK_COLLIDE_R = BLOCK_SIZE * 0.58;
+  // Dodekaeder mit zwölf verschiedenfarbigen Seiten. Der Abstand zweier
+  // gegenüberliegender Flächen (2 * Inkugelradius) entspricht BLOCK_SIZE, so
+  // passt er wie der frühere Würfel zwischen die Backen. Die Geometrie wird so
+  // gedreht, dass eine Fläche nach unten zeigt und er bei Identitäts-
+  // Rotation flach auf dem Boden liegt (Mittelpunkt auf Höhe BLOCK_SIZE / 2).
+  var dodeGeo = new THREE.DodecahedronGeometry(BLOCK_SIZE / 2 * 1.4013 / 1.1135);
+  (function(){
+    var pos = dodeGeo.attributes.position;
+    var a = new THREE.Vector3().fromBufferAttribute(pos, 0);
+    var b = new THREE.Vector3().fromBufferAttribute(pos, 1);
+    var c = new THREE.Vector3().fromBufferAttribute(pos, 2);
+    var n = b.clone().sub(a).cross(c.clone().sub(a)).normalize();
+    dodeGeo.applyMatrix4(new THREE.Matrix4().makeRotationFromQuaternion(
+      new THREE.Quaternion().setFromUnitVectors(n, new THREE.Vector3(0, -1, 0))));
+    // Je Fünfeck 3 Dreiecke = 9 Vertices -> eine Farbe pro Seite.
+    var faceColors = [0xef4444, 0xf97316, 0xfacc15, 0x84cc16, 0x22c55e, 0x14b8a6,
+                      0x06b6d4, 0x3b82f6, 0x6366f1, 0xa855f7, 0xec4899, 0xf5f5f4];
+    var colors = new Float32Array(pos.count * 3);
+    var col = new THREE.Color();
+    for (var i = 0; i < pos.count; i++){
+      col.setHex(faceColors[Math.floor(i / 9)]);
+      colors[i * 3] = col.r; colors[i * 3 + 1] = col.g; colors[i * 3 + 2] = col.b;
+    }
+    dodeGeo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  })();
   var block = new THREE.Mesh(
-    new THREE.BoxGeometry(BLOCK_SIZE, BLOCK_SIZE, BLOCK_SIZE),
-    new THREE.MeshStandardMaterial({ color: 0xef4444, roughness: 0.6, metalness: 0.05 })
+    dodeGeo,
+    new THREE.MeshStandardMaterial({ vertexColors: true, flatShading: true, roughness: 0.6, metalness: 0.05 })
   );
   // Reichweite ca. 3.0 Einheiten: nah genug für einen Greifvorgang, aber
   // weit genug, dass der Ellbogen (Achse 3, Limit ±120°) nicht über sein
@@ -1144,6 +1265,7 @@
       reparentPreservingWorld(block, scene);
       grasped = false;
     }
+    resetGripperCamZoom();
     dragging = false;
     settling = false;
     block.position.copy(blockStartPos);
@@ -1276,6 +1398,79 @@
     return { a2: Math.round(overallBest.a2), a3: Math.round(overallBest.a3), dist: overallBest.dist };
   }
 
+  var CAM_FOV_DEFAULT = gripperCam.fov;
+  // Am Schluss füllt die Mondbahn des äußersten Mondes (plus Rand) das Bild.
+  var SATURN_FRAME_FILL = 0.85;
+
+  // Grobe Rastersuche über a1..a3 (a4 = 0): Greiferachse (lokal +Y) soll auf
+  // Saturn (im Zenit) zeigen; bei gleicher Abweichung gewinnt die kleinere
+  // Bewegung.
+  function solvePointAtSaturn(){
+    var dir = new THREE.Vector3();
+    var wristPos = new THREE.Vector3();
+    var saturnPos = saturnSystem.position;
+    var best = { a1: 0, a2: 0, a3: 0 }, bestCost = Infinity;
+    function search(r1, r2, r3, step1, step2, step3){
+      var c1 = best.a1, c2 = best.a2, c3 = best.a3;
+      for (var a1 = Math.max(-180, c1 - r1); a1 <= Math.min(180, c1 + r1); a1 += step1){
+        for (var a2 = Math.max(-90, c2 - r2); a2 <= Math.min(90, c2 + r2); a2 += step2){
+          for (var a3 = Math.max(-120, c3 - r3); a3 <= Math.min(120, c3 + r3); a3 += step3){
+            var cand = { a1: a1, a2: a2, a3: a3, a4: 0, a5: state.a5 };
+            applyCandidatePose(cand);
+            wristRoll.updateWorldMatrix(true, false);
+            dir.set(0, 1, 0).transformDirection(wristRoll.matrixWorld);
+            wristPos.setFromMatrixPosition(wristRoll.matrixWorld);
+            var toSaturn = saturnPos.clone().sub(wristPos).normalize();
+            var err = Math.acos(clamp(dir.dot(toSaturn), -1, 1));
+            var cost = err + 0.0001 * (Math.abs(a1 - state.a1) + Math.abs(a2 - state.a2) + Math.abs(a3 - state.a3));
+            if (cost < bestCost && computeClearance(cand) >= 0.05){ bestCost = cost; best = { a1: a1, a2: a2, a3: a3 }; }
+          }
+        }
+      }
+    }
+    search(180, 90, 120, 4, 6, 6); // grob über den ganzen Bereich
+    search(4, 6, 6, 1, 1, 1);      // fein um das grobe Optimum
+    applyStateToRobot();
+    return best;
+  }
+
+  // Langsam auf Saturn samt Monden heranzoomen (gleichmäßig im Log-Maßstab),
+  // bis die äußerste Mondbahn das Bild füllt.
+  function zoomGripperCam(duration){
+    return new Promise(function(resolve){
+      var tanStart = Math.tan(THREE.MathUtils.degToRad(CAM_FOV_DEFAULT / 2));
+      var maxOrbit = Math.max.apply(null, saturnMoons.map(function(m){ return m.r; }));
+      var GALAXY_ZOOM = Math.max(1, tanStart * SATURN_FRAME_FILL * SATURN_Y / maxOrbit);
+      var startTime = null;
+      function step(now){
+        if (demoCancelled){ resolve(); return; }
+        if (startTime === null) startTime = now;
+        var t = clamp((now - startTime) / duration, 0, 1);
+        var zoom = Math.pow(GALAXY_ZOOM, easeInOutQuad(t));
+        setGripperZoom(zoom);
+        if (t < 1) requestAnimationFrame(step); else resolve();
+      }
+      requestAnimationFrame(step);
+    });
+  }
+
+  // Zoom-Faktor (Brennweite, 1 = Standard) setzen und den Regler nachführen.
+  // Regler ist logarithmisch: 0..100 -> 1x..10x.
+  var zoomSlider = document.getElementById('cam-zoom');
+  var zoomValueEl = document.getElementById('val-cam-zoom');
+  function setGripperZoom(zoom){
+    var tanStart = Math.tan(THREE.MathUtils.degToRad(CAM_FOV_DEFAULT / 2));
+    gripperCam.fov = THREE.MathUtils.radToDeg(2 * Math.atan(tanStart / zoom));
+    gripperCam.updateProjectionMatrix();
+    zoomSlider.value = Math.log10(zoom) * 100;
+    zoomValueEl.textContent = zoom.toFixed(1).replace('.', ',') + '\u00d7';
+  }
+  zoomSlider.addEventListener('input', function(){
+    setGripperZoom(Math.pow(10, zoomSlider.value / 100));
+  });
+
+  function resetGripperCamZoom(){ setGripperZoom(1); }
+
   function buildDemoSteps(){
     var blockWorld = new THREE.Vector3();
     block.getWorldPosition(blockWorld);
@@ -1317,6 +1512,7 @@
     var dropPoint = new THREE.Vector3(Math.cos(dropRad) * dropReach, 0.35, -Math.sin(dropRad) * dropReach);
     var drop = solveA2A3ForPoint(a1Drop, dropPoint, hover.a2, hover.a3);
 
+    var galaxyPose = solvePointAtSaturn();
     var steps = [
       { axis: 'a1', to: a1Target },     // Basis exakt zum Klotz drehen
       { axis: 'a5', to: 60 },           // Zange weit öffnen
@@ -1336,7 +1532,11 @@
       { axis: 'a2', to: -25 },
       { axis: 'a4', to: 0 },
       { axis: 'a1', to: 0 },
-      { axis: 'a5', to: 30 }
+      { axis: 'a5', to: 30 },
+      // Am Ende zur Spiralgalaxie ausrichten (danach Zoom, siehe runIntroDemo)
+      { axis: 'a1', to: galaxyPose.a1 },
+      { axis: 'a2', to: galaxyPose.a2 },
+      { axis: 'a3', to: galaxyPose.a3 }
     ];
 
     // Schritte ohne echte Bewegung weglassen, statt 2 s still zu stehen.
@@ -1453,6 +1653,7 @@
     demoBtn.disabled = true;
     demoBanner.hidden = false;
     startWarningTone();
+    resetGripperCamZoom();
 
     var steps = buildDemoSteps();
     var chain = Promise.resolve();
@@ -1461,6 +1662,10 @@
         if (demoCancelled) return;
         return tweenAxis(s.axis, s.to, DEMO_STEP_DURATION);
       });
+    });
+    chain = chain.then(function(){
+      if (demoCancelled) return;
+      return zoomGripperCam(8000);
     });
     chain.then(function(){
       // Nach einem Reset-Abbruch darf ein alter Durchlauf einen neu
@@ -1528,6 +1733,7 @@
     applyStateToRobot();
     updateGrabLogic();
     updateSettleTween();
+    updateSaturn(performance.now() / 1000);
     updateCameraPosition();
     renderer.render(scene, camera);
     camRenderer.render(scene, gripperCam);

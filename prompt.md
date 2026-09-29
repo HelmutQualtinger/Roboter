@@ -42,3 +42,11 @@ Er findet den Klotz nicht, die Kollisionsdetektion funktioniert während der Fah
 
 ❯ /goal dont stop before you pick up and drop the cube
   ⎿  Goal set: dont stop before you pick up and drop the cube
+
+- Ersetze den Würfel durch ein Dodekaeder mit verschiedenfarbigen Seiten.
+- Am Ende des Pick-up den Arm zur Spiralgalaxie ausrichten und mit der Greiferkamera langsam 10-fach heranzoomen.
+- Dodekaeder größer.
+- Am Zenit Saturn mit Ringen hinzufügen, umkreist von drei Monden.
+- Am Schluss der Demo auf Saturn mit seinen Monden zentrieren und zoomen (statt auf die Galaxie).
+- Saturn und Laufbahnen schräg stellen.
+- Slider kompakter machen und einen Slider für den Kamerazoom hinzufügen.

@@ -23,6 +23,11 @@
 8. Auf **GitHub Pages** veröffentlicht (`https://helmutqualtinger.github.io/Roboter/`).
 9. **Social-Media-Vorschau**: Open-Graph-/Twitter-Bild und -Beschreibung hinterlegt.
 10. **Sternenhimmel mit Galaxien** als Hintergrund statt flacher Farbe.
+11. **Schatten** von Roboter und Würfel, zweite schattenwerfende Lichtquelle.
+12. Würfel durch ein **Dodekaeder mit zwölf verschiedenfarbigen Seiten** ersetzt und vergrößert (`BLOCK_SIZE` 0,22 → 0,3).
+13. **Saturn im Zenit** (gebänderte Kugel, Ringe mit Cassini-Teilung, drei Monde), Ringe und Laufbahnen schräg, Laufbahnen als Linien sichtbar.
+14. **Demo-Ende:** Arm richtet sich auf Saturn aus (Rastersuche + Feinsuche über a1–a3), Greiferkamera zoomt in 8 s so weit heran, dass die äußerste Mondbahn das Bild füllt.
+15. **Kompaktere Regler** (eine Zeile pro Achse) und neuer **Kamerazoom-Regler** (1×–10×).
 
 ## Aktueller Stand von `robot-arm.html`
 
@@ -41,8 +46,8 @@
 - **Greifen:** Zange ≤ 12 % geschlossen und TCP (Punkt zwischen den Backen) näher als 0,4 am Würfel → Würfel wird an den Greifer gehängt. Öffnen ≥ 22 % → loslassen, Würfel sinkt ab und richtet sich flach aus (Drehung um die Hochachse bleibt).
 - **Kollisionssperre:** Greifer wird durch Kugeln angenähert (Gehäuse, beide Backenspitzen, TCP). Jede Bewegung, die tiefer in Boden oder Würfel führen würde, wird blockiert (Achsen-Box blinkt rot); Zurückfahren bleibt erlaubt. Gilt für Regler und Demo gleichermaßen. Sitzt der Würfel zwischen den Backen, dürfen diese ihn berühren.
 - **Greifer-Kamera:** am Greifer montiert, Bild oben rechts im 3D-Bereich.
-- **Pick-up-Demo (Button):** Basis zum Würfel → Zange öffnen → über dem Würfel schweben → Zange um −90° drehen (Backen waagerecht) → absenken → schließen → sofort anheben → zum Ablageort (+130°) drehen → knapp über dem Boden absenken → loslassen → zurück in Ruhestellung. Warnton (Web Audio) läuft währenddessen, Regler sind gesperrt, Reset bricht ab.
-- **Reset:** Ruhestellung und Würfel an Startposition (3,0 / 0,11 / 0).
+- **Pick-up-Demo (Button):** Basis zum Würfel → Zange öffnen → über dem Würfel schweben → Zange um −90° drehen (Backen waagerecht) → absenken → schließen → sofort anheben → zum Ablageort (+130°) drehen → knapp über dem Boden absenken → loslassen → zurück in Ruhestellung → auf Saturn ausrichten → Endzoom der Greiferkamera. Warnton (Web Audio) läuft währenddessen, Regler sind gesperrt, Reset bricht ab.
+- **Reset:** Ruhestellung, Würfel an Startposition (3,0 / `BLOCK_SIZE`/2 / 0) und Kamerazoom 1×.
 - **Hintergrund:** große, von innen sichtbare Kugel (Radius 500) mit prozedural gezeichneter Himmelstextur (2048×1024 Canvas, kein externes Bild) – ca. 1400 Sterne, drei farbige Spiralgalaxien mit Kern/Scheibe/Spiralarmen, schwaches Milchstraßenband. Vom Nebel ausgenommen (`fog:false`), damit er den Himmel nicht verwäscht; dreht sich mit der Kamera mit.
 
 ## Wichtige Erkenntnisse und behobene Fehler
@@ -83,6 +88,8 @@ Mit Playwright (Chromium, headless) im echten Browser geprüft, Testskripte lage
 
 - Liegt der Würfel außerhalb der erreichbaren Zone (zu nah an der Basis), greift die Demo daneben – es gibt noch keine Meldung dafür.
 - Liegt der Würfel nicht auf der Armachse bzw. ist gedreht, können die Backen nicht gleichzeitig waagerecht und kantenparallel stehen; der Löser wählt dann den besten Kompromiss.
+- Die Backen sind auf die Kanten eines Würfels ausgelegt (`solveGripperRoll`, 90°-Symmetrie); beim Dodekaeder passt das nur näherungsweise.
+- Saturn liegt bei y = 100 in der Szene, damit der Endzoom das Gesamtsystem einrahmt; die Monde sind dafür überproportional groß.
 - Der Würfel sinkt beim Loslassen linear ab (keine echte Physik).
 - Die Orbit-Kamera lässt bei sehr nahem Zoom kombiniert mit starker Neigung ein Abtauchen unter die Bodenplatte zu (man sieht dann die Unterseite des Sockels). Vorbestehend, nicht durch den Sternenhimmel verursacht, noch nicht behoben.
 

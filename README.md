@@ -7,11 +7,14 @@ Ein browserbasierter Simulator für einen 5-achsigen Greifarm, gebaut mit [three
 ## Funktionen
 
 - **5 Achsen** einzeln über Regler steuerbar: Basisdrehung, Schulter, Ellbogen, Greiferdrehung und Zange (öffnen/schließen).
-- **Greifbarer Klotz** auf dem Boden, der aufgenommen, transportiert und wieder abgelegt werden kann.
+- **Greifbarer Dodekaeder** mit zwölf verschiedenfarbigen Seiten auf dem Boden, der aufgenommen, transportiert und wieder abgelegt werden kann.
 - **Kollisionserkennung** zwischen Greifer, Boden und Klotz – eine Bewegung, die tiefer in eine Kollision hineinführen würde, wird blockiert; nur ein Zurückfahren ist erlaubt.
-- **Kamera am Greifer** montiert, mittig zwischen den Zangenbacken; das Live-Bild erscheint im kleinen Monitor oben rechts.
+- **Kamera am Greifer** montiert, mittig zwischen den Zangenbacken; das Live-Bild erscheint im kleinen Monitor oben rechts. Ein eigener Regler „Kamerazoom“ (1×–10×, logarithmisch) zoomt das Bild.
+- **Kompakte Bedienung:** jede Achse (und der Kamerazoom) belegt nur eine Zeile: Name, Regler, Wert.
+- **Sternenhimmel** mit Galaxien und **Saturn im Zenit**: schräg gestellte Ringe und drei Monde auf eigenen, unterschiedlich geneigten Laufbahnen (als dünne Linien sichtbar).
+- **Schatten** von Roboter und Dodekaeder auf dem Boden (zwei Lichtquellen).
 - **Schachbrett-Boden** aus prozedural erzeugten Stahlplatten mit Fugenlinien und Rostspuren.
-- **Pick-up-Demo per Knopfdruck**: Der Arm fährt langsam (eine Achse nach der anderen, je 2 Sekunden) zum Klotz, greift ihn, legt ihn an anderer Stelle ab – begleitet von einem akustischen Sicherheits-Warnton.
+- **Pick-up-Demo per Knopfdruck**: Der Arm fährt langsam (eine Achse nach der anderen, je 2 Sekunden) zum Klotz, greift ihn, legt ihn an anderer Stelle ab – begleitet von einem akustischen Sicherheits-Warnton. Am Ende richtet sich der Arm auf Saturn aus, und die Greiferkamera zoomt langsam auf den Planeten samt Monden.
 
 ## Verwendung
 
@@ -32,7 +35,7 @@ Anschließend `http://localhost:8000/robot-arm.html` im Browser aufrufen.
 **Bedienung:**
 
 - Mit der Maus im 3D-Bild ziehen, um die Kamera zu drehen; scrollen zum Zoomen.
-- Den roten Klotz direkt mit der Maus verschieben, solange er nicht gegriffen ist.
+- Den Dodekaeder direkt mit der Maus verschieben, solange er nicht gegriffen ist.
 - Zum Greifen: Zange schließen (Achse 5 nahe 0 %), während die Greiferspitze nah am Klotz ist.
 - Zum Loslassen: Zange öffnen.
 - „Pick-up starten“ löst die automatische Demo aus; „Reset“ setzt Arm und Klotz auf die Ausgangsposition zurück (bricht eine laufende Demo ab).
