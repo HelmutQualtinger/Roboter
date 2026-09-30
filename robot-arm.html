@@ -1278,7 +1278,25 @@
     pointerNDC.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
   }
 
+  // Pinch-Zoom (Touch): aktive Zeiger merken; bei zwei Fingern ändert der
+  // Abstand den Kamera-Radius, Ziehen/Drehen mit einem Finger pausiert.
+  var activePointers = new Map();
+  var pinchDist = 0;
+  function currentPinchDist(){
+    var pts = Array.from(activePointers.values());
+    return Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+  }
+
   canvas.addEventListener('pointerdown', function(e){
+    activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (activePointers.size === 2){
+      dragging = false;
+      orbiting = false;
+      pinchDist = currentPinchDist();
+      canvas.setPointerCapture(e.pointerId);
+      return;
+    }
+    if (activePointers.size > 2) return;
     setPointerNDC(e);
     lastPointerX = e.clientX;
     lastPointerY = e.clientY;
@@ -1298,6 +1316,13 @@
   });
 
   canvas.addEventListener('pointermove', function(e){
+    if (activePointers.has(e.pointerId)) activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (activePointers.size === 2){
+      var d = currentPinchDist();
+      if (pinchDist > 0 && d > 0) cam.radius = clamp(cam.radius * pinchDist / d, 2.5, 16);
+      pinchDist = d;
+      return;
+    }
     if (dragging){
       setPointerNDC(e);
       raycaster.setFromCamera(pointerNDC, camera);
@@ -1318,6 +1343,8 @@
   });
 
   function endPointerInteraction(e){
+    if (e && e.pointerId !== undefined) activePointers.delete(e.pointerId);
+    pinchDist = 0;
     dragging = false;
     orbiting = false;
     if (e && e.pointerId !== undefined){
@@ -1326,7 +1353,7 @@
   }
   canvas.addEventListener('pointerup', endPointerInteraction);
   canvas.addEventListener('pointercancel', endPointerInteraction);
-  canvas.addEventListener('pointerleave', function(){ orbiting = false; });
+  canvas.addEventListener('pointerleave', function(e){ if (e.pointerType === 'mouse') orbiting = false; });
 
   canvas.addEventListener('wheel', function(e){
     e.preventDefault();
